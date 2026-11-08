@@ -2,6 +2,10 @@
 
 アーティファクトとして作成したプロトタイプを格納し、GitHub Pages として公開するリポジトリです。
 
+## 公開URL
+
+- https://takedatakumi.github.io/toy-box/
+
 ## 構成
 
 - `public/` : 公開対象。`public/index.html` が一覧ページ
