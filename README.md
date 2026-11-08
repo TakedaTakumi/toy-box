@@ -4,9 +4,7 @@
 
 ## 公開URL
 
-- 一覧ページ: https://takedatakumi.github.io/toy-box/
-- すうじモンスター: https://takedatakumi.github.io/toy-box/games/suuji-monster/
-- ポリリズム／ポリメーター: https://takedatakumi.github.io/toy-box/tools/polyrhythm/
+- https://takedatakumi.github.io/toy-box/
 
 ## 構成
 
@@ -18,8 +16,7 @@
 
 1. `public/<カテゴリ>/<プロトタイプ名>/` を作り、`index.html` を置く
 2. `public/index.html` のカテゴリの見出しの下にリンクを追加する
-3. この README の公開URLに追記する
-4. main にマージすると GitHub Actions で自動公開される
+3. main にマージすると GitHub Actions で自動公開される
 
 ## 初回設定
 
