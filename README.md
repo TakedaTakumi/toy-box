@@ -6,7 +6,7 @@
 
 - `public/` : 公開対象。`public/index.html` が一覧ページ
 - `public/<カテゴリ>/<プロトタイプ名>/index.html` : 各プロトタイプ(画像・JS・READMEなどは同じフォルダに置く)
-- カテゴリ: `games`(ゲーム)
+- カテゴリ: `games`(ゲーム) / `tools`(可視化・学習ツール)
 
 ## プロトタイプの追加
 
