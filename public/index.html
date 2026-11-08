@@ -5,19 +5,87 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>toy-box</title>
 <style>
-  body { font-family: system-ui, sans-serif; max-width: 40rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; }
+  :root {
+    color-scheme: light dark;
+    --bg: #f4f6fb;
+    --surface: #ffffff;
+    --ink: #1c2438;
+    --muted: #5d6a85;
+    --line: #dde3ef;
+    --accent: #4f6bed;
+    --accent-ink: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #11151f;
+      --surface: #1a2030;
+      --ink: #e8ecf6;
+      --muted: #9aa6c0;
+      --line: #2b3550;
+      --accent: #8da2ff;
+      --accent-ink: #11151f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif;
+    line-height: 1.7;
+  }
+  main { max-width: 56rem; margin: 0 auto; padding: 40px 16px 64px; }
+  h1 { margin: 0 0 4px; font-size: 2rem; letter-spacing: .02em; }
+  .lead { margin: 0 0 32px; color: var(--muted); }
+  h2 {
+    margin: 32px 0 12px;
+    padding-left: 12px;
+    border-left: 4px solid var(--accent);
+    font-size: 1.1rem;
+  }
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+    gap: 14px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .cards a {
+    display: block;
+    height: 100%;
+    padding: 16px 18px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    color: inherit;
+    text-decoration: none;
+    transition: transform .15s, box-shadow .15s, border-color .15s;
+  }
+  .cards a:hover { transform: translateY(-3px); border-color: var(--accent); box-shadow: 0 8px 20px rgba(0, 0, 0, .12); }
+  .cards a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .title { display: block; font-weight: 700; font-size: 1.05rem; }
+  .desc { display: block; margin-top: 4px; color: var(--muted); font-size: .9rem; }
+  @media (prefers-reduced-motion: reduce) {
+    .cards a { transition: none; }
+    .cards a:hover { transform: none; }
+  }
 </style>
 </head>
 <body>
+<main>
 <h1>toy-box</h1>
-<p>アーティファクトとして作成したプロトタイプの一覧です。</p>
+<p class="lead">アーティファクトとして作成したプロトタイプの一覧です。</p>
+
 <h2>ゲーム</h2>
-<ul>
-  <li><a href="games/suuji-monster/">すうじモンスター</a> - たしざん・ひきざんの計算ゲーム</li>
+<ul class="cards">
+  <li><a href="games/suuji-monster/"><span class="title">すうじモンスター</span><span class="desc">たしざん・ひきざんの計算ゲーム</span></a></li>
 </ul>
+
 <h2>ツール</h2>
-<ul>
-  <li><a href="tools/polyrhythm/">ポリリズム／ポリメーター</a> - 音を聴きながら円形・タイムラインで見比べる</li>
+<ul class="cards">
+  <li><a href="tools/polyrhythm/"><span class="title">ポリリズム／ポリメーター</span><span class="desc">音を聴きながら円形・タイムラインで見比べる</span></a></li>
 </ul>
+</main>
 </body>
 </html>
