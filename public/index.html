@@ -51,24 +51,34 @@
     padding: 0;
     list-style: none;
   }
-  .cards a {
-    display: block;
-    height: 100%;
-    padding: 16px 18px;
+  .cards li {
+    display: flex;
+    flex-direction: column;
     background: var(--surface);
     border: 1px solid var(--line);
     border-radius: 14px;
-    color: inherit;
-    text-decoration: none;
     transition: transform .15s, box-shadow .15s, border-color .15s;
   }
-  .cards a:hover { transform: translateY(-3px); border-color: var(--accent); box-shadow: 0 8px 20px rgba(0, 0, 0, .12); }
-  .cards a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .cards li:hover, .cards li:focus-within { transform: translateY(-3px); border-color: var(--accent); box-shadow: 0 8px 20px rgba(0, 0, 0, .12); }
+  .cards .main {
+    display: block;
+    flex: 1;
+    padding: 16px 18px 8px;
+    color: inherit;
+    text-decoration: none;
+  }
+  .cards .doc {
+    display: block;
+    padding: 6px 18px 12px;
+    color: var(--accent);
+    font-size: .85rem;
+  }
+  .cards a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
   .title { display: block; font-weight: 700; font-size: 1.05rem; }
   .desc { display: block; margin-top: 4px; color: var(--muted); font-size: .9rem; }
   @media (prefers-reduced-motion: reduce) {
-    .cards a { transition: none; }
-    .cards a:hover { transform: none; }
+    .cards li { transition: none; }
+    .cards li:hover, .cards li:focus-within { transform: none; }
   }
 </style>
 </head>
@@ -79,12 +89,17 @@
 
 <h2>ゲーム</h2>
 <ul class="cards">
-  <li><a href="games/suuji-monster/"><span class="title">すうじモンスター</span><span class="desc">たしざん・ひきざんの計算ゲーム</span></a></li>
+  <li><a class="main" href="games/suuji-monster/"><span class="title">すうじモンスター</span><span class="desc">たしざん・ひきざんの計算ゲーム</span></a><a class="doc" href="games/suuji-monster/README.html">ドキュメント</a></li>
 </ul>
 
 <h2>ツール</h2>
 <ul class="cards">
-  <li><a href="tools/polyrhythm/"><span class="title">ポリリズム／ポリメーター</span><span class="desc">音を聴きながら円形・タイムラインで見比べる</span></a></li>
+  <li><a class="main" href="tools/polyrhythm/"><span class="title">ポリリズム／ポリメーター</span><span class="desc">音を聴きながら円形・タイムラインで見比べる</span></a><a class="doc" href="tools/polyrhythm/README.html">ドキュメント</a></li>
+</ul>
+
+<h2>アート・演出</h2>
+<ul class="cards">
+  <li><a class="main" href="art/arrow-trail/"><span class="title">矢印の軌跡（飛行モデル版）</span><span class="desc">飛び回る矢印の軌跡と、ミサイル戦を眺める3Dアニメーション</span></a><a class="doc" href="art/arrow-trail/README.html">ドキュメント</a></li>
 </ul>
 </main>
 </body>
