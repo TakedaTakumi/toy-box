@@ -1122,7 +1122,7 @@
     }
     m.age += dt;
     m.turnRate = 0;
-    if (m.tgt && (!m.tgt.on || m.tgt.dead)) { m.tgt = nearestEnemy(m.pos, m.team); m.flare = null; }   // 標的が消えたら、別の標的を狙う
+    if (m.tgt && (!m.tgt.on || m.tgt.dead || m.tgt.arriving)) { m.tgt = nearestEnemy(m.pos, m.team); m.flare = null; }   // 標的が消えた・補充されて飛来中になったら、別の標的を狙う
 
     // フレアに惑わされる（一度だけ）
     if (!m.flare && m.fool && m.tgt && m.age > 0.7) {
