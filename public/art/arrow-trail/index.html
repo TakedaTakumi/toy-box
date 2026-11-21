@@ -197,6 +197,7 @@
     </fieldset>
     <label class="check" id="followCamRow" hidden><input id="followCam" type="checkbox">追従カメラ</label>
     <label class="check" id="gunRow" hidden><input id="gun" type="checkbox" checked>機銃</label>
+    <label class="check" id="aceRow" hidden><input id="ace" type="checkbox" checked>エース機</label>
     <fieldset class="mode">
       <legend>視点</legend>
       <label class="check"><input id="viewObl" type="radio" name="view" value="oblique" checked>斜め</label>
@@ -276,7 +277,7 @@
   function rand(a, b) { return a + Math.random() * (b - a); }
 
   var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var state = { count: 8, speed: 1, len: 450, size: 1.5, auto: !reduceMotion, terrain: true, paused: false, volley: 9, mode: 'free', view: 'oblique', nAtk: 4, nTgt: 4, hp: 4, autoNext: false, followObj: null, followGen: 0, followCam: false, followTeam: 'B', respawn: 0, score: [0, 0], gun: true };
+  var state = { count: 8, speed: 1, len: 450, size: 1.5, auto: !reduceMotion, terrain: true, paused: false, volley: 9, mode: 'free', view: 'oblique', nAtk: 4, nTgt: 4, hp: 4, autoNext: false, followObj: null, followGen: 0, followCam: false, followTeam: 'B', respawn: 0, score: [0, 0], gun: true, ace: true };
 
   var renderer;
   try {
@@ -424,6 +425,7 @@
     a.arrP = new THREE.Vector3(); // 飛来中に向かう戦場内の点
     a.on = false; a.dead = false; a.gen = 0;     // 使用中か・撃墜されたか・世代（補充のたびに増える）
     a.hp = 1; a.hpMax = 1; a.flash = 0; a.fade = 0; a.respawnT = 0;
+    a.ace = false; a.kills = 0;
     a.count = 0;
     a.root.visible = false;
     scene.add(a.root);
@@ -432,14 +434,14 @@
   }
 
   function paintTrail(a) {
-    var L = state.len, c = a.color, col = a.trailCol, head0 = 1.2 * state.size;
+    var L = state.len, c = a.color, col = a.trailCol, head0 = 1.2 * state.size, gain = a.ace ? ACE_TRAIL : 1;
     for (var i = 0; i < CAP; i++) {
       var age = CAP - 1 - i;
       var t = Math.max(0, 1 - age / L);
       var b = Math.pow(t, 1.6) * 0.6;
       // 機体の近くは透明にし、後ろへ向かって徐々に濃くする（矢印との重なりを避ける）
       var u = clamp((age - head0) / 6, 0, 1);
-      b *= u * u * (3 - 2 * u);
+      b *= u * u * (3 - 2 * u) * gain;
       for (var k = 0; k < 2; k++) {
         var o = (i * 2 + k) * 3;
         col[o] = c.r * b;
@@ -833,8 +835,9 @@
   // 指令 → ロール・ピッチ・ヨーの角速度（上限と応答の遅れつき）
   function controls(a, dt) {
     var auth = clamp((a.speed - 8) / 12, 0.25, 1);               // 低速では舵が効きにくい
-    var qMax = Math.min(2.4, a.nLim * G / Math.max(a.speed, 12)) * auth;   // Gの上限
-    var pMax = a.pLim * auth;
+    var turn = a.ace ? ACE_TURN : 1;
+    var qMax = Math.min(2.4, a.nLim * G / Math.max(a.speed, 12)) * auth * turn;   // Gの上限
+    var pMax = a.pLim * auth * turn;
     var cp, cq, cr;
     if (a.direct) { cp = a.direct.p; cq = a.direct.q; cr = a.direct.r; }
     else { steer(a, a.dd); cp = a.cp; cq = a.cq; cr = a.cr; }
@@ -1116,7 +1119,7 @@
     m.mat.opacity = 1;
     m.line.visible = true;
     var K = MISSILE[atk.mKind];
-    m.kind = atk.mKind; m.head = K.head;
+    m.kind = atk.mKind; m.head = K.head; m.shooter = atk; m.sgen = atk.gen;
     m.tgt = atk.tgt; m.team = atk.team; m.flare = null; m.fool = !!K.decoy && Math.random() < 0.8;
     m.pos.copy(atk.pos).addScaledVector(atk.rt, rand(-1.5, 1.5)).addScaledVector(atk.upv, -0.6);
     var ang = rand(0, 6.2832), spread = rand(0.5, 1.25);
@@ -1204,7 +1207,7 @@
       m.turnRate = Math.acos(clamp(_v1.dot(m.dir), -1, 1)) / Math.max(dt, 1e-6);
       if (dist < (m.flare ? 4 : 3.5)) {
         explode(m.pos, m.flare ? 0.6 : MISSILE[m.kind].big);
-        if (!m.flare && m.tgt) hitTarget(m.tgt, m.team, MISSILE[m.kind].dmg);
+        if (!m.flare && m.tgt) hitTarget(m.tgt, m.team, MISSILE[m.kind].dmg, m.shooter, m.sgen);
         killMissile(m);
         return;
       }
@@ -1237,7 +1240,7 @@
 
   var bu = {
     p: new Float32Array(MAXB * 3), v: new Float32Array(MAXB * 3),
-    life: new Float32Array(MAXB), team: new Uint8Array(MAXB), next: 0,
+    life: new Float32Array(MAXB), team: new Uint8Array(MAXB), sh: new Uint8Array(MAXB), sg: new Int32Array(MAXB), next: 0,
     pos: new Float32Array(MAXB * 6), col: new Float32Array(MAXB * 6)
   };
   (function () {
@@ -1285,7 +1288,7 @@
     bu.p[o] = a.pos.x + a.fwd.x * nose; bu.p[o + 1] = a.pos.y + a.fwd.y * nose; bu.p[o + 2] = a.pos.z + a.fwd.z * nose;
     bu.v[o] = _v1.x * sp; bu.v[o + 1] = _v1.y * sp; bu.v[o + 2] = _v1.z * sp;
     bu.life[i] = 0.55;
-    bu.team[i] = a.team;
+    bu.team[i] = a.team; bu.sh[i] = a.idx; bu.sg[i] = a.gen;
   }
 
   function stepBullets(h) {
@@ -1316,7 +1319,7 @@
         if (dx * dx + dy * dy + dz * dz < r2) { hit = t; break; }
       }
       if (hit) {
-        hitTarget(hit, team, GUN_DMG);
+        hitTarget(hit, team, GUN_DMG, air[bu.sh[i]], bu.sg[i]);
         for (var n = 0; n < 3; n++) {
           emit(sparkP, bx, by, bz, rand(-9, 9), rand(-9, 9), rand(-9, 9), rand(0.2, 0.35), col ? 1 : 0.7, col ? 0.8 : 0.9, col ? 0.5 : 1);
         }
@@ -1407,6 +1410,7 @@
 
   function colorFor(a) {
     if (state.mode === 'free' || !a.role) return PALETTE[a.idx % PALETTE.length];
+    if (a.ace) return ACE_COLOR;
     if (state.mode === 'duel') {
       return a.team === 0 ? ((a.idx % 2) ? 0x9be7ff : 0x5cd6ff) : ((a.idx % 2) ? 0xffd08a : 0xffb347);   // A: 水色系、B: 琥珀系
     }
@@ -1417,7 +1421,7 @@
     var hex = colorFor(a);
     a.color.setHex(hex);
     a.fillMat.color.copy(a.color);
-    a.edgeCol.copy(a.color).lerp(WHITE, 0.45);
+    a.edgeCol.copy(a.color).lerp(WHITE, a.ace ? 0.2 : 0.45);
     a.edgeMat.color.copy(a.edgeCol);
     a.drop.material.color.copy(a.color);
     paintTrail(a);
@@ -1428,6 +1432,7 @@
     reset(a);
     a.gen++;
     a.dead = false; a.fade = 0; a.flash = 0; a.arriving = false;
+    a.ace = false; a.kills = 0;
     a.hpMax = state.hp; a.hp = state.hp;
     a.mKind = MISSILE_KINDS[Math.floor(Math.random() * MISSILE_KINDS.length)];    // 機体ごとに生成時に決めて固定する
     a.trailMat.opacity = 1;
@@ -1494,18 +1499,70 @@
         clearTrail(a);
       }
     }
+    if (full && state.ace) assignStartAces();
     if (full) { state.followObj = null; state.followGen = 0; }
   }
 
+  /* ---------- エース機 ----------
+     開始時は各チームの攻撃する側の1機がエース。撃墜数が ACE_KILLS に達した機体も昇格する。 */
+  var ACE_KILLS = 3, ACE_HP = 1.5, ACE_TURN = 1.1, ACE_SALVO = 2, ACE_TRAIL = 1.35, ACE_COLOR = 0xffd54a;
+
+  function maxHpOf(a) { return a.ace ? Math.max(state.hp + 1, Math.ceil(state.hp * ACE_HP)) : state.hp; }
+
+  // 耐久力の上限を変え、残りの割合を保って現在値を換算する
+  function rescaleHp(a) {
+    var frac = a.hpMax > 0 ? a.hp / a.hpMax : 1;
+    a.hpMax = maxHpOf(a);
+    if (!a.dead) a.hp = Math.max(1, Math.ceil(frac * a.hpMax - 1e-6));
+  }
+
+  function setAce(a, on) {
+    if (a.ace === on) return;
+    a.ace = on;
+    rescaleHp(a);
+    applyColor(a);
+  }
+
+  // 昇格のとき、耐久力の増えた分だけ現在値も増やす
+  function promoteAce(a) {
+    var before = a.hpMax;
+    a.ace = true; a.hpMax = maxHpOf(a);
+    a.hp = Math.min(a.hpMax, a.hp + (a.hpMax - before));
+    applyColor(a);
+    emit(flashP, a.pos.x, a.pos.y, a.pos.z, 0, 0, 0, 0.5, 1, 0.85, 0.35);
+    for (var i = 0; i < 24; i++) {
+      var u = rand(-1, 1), th = rand(0, 6.2832), r = Math.sqrt(1 - u * u), sp = rand(8, 22);
+      emit(sparkP, a.pos.x, a.pos.y, a.pos.z, r * Math.cos(th) * sp, u * sp, r * Math.sin(th) * sp, rand(0.6, 1.2), 1, 0.85, 0.3);
+    }
+  }
+
+  function creditKill(shooter, sgen) {
+    if (!shooter || !shooter.on || shooter.dead || shooter.gen !== sgen) return;
+    shooter.kills++;
+    if (state.ace && !shooter.ace && shooter.kills >= ACE_KILLS) promoteAce(shooter);
+  }
+
+  // 戦闘の開始時に、攻撃する側の先頭の1機をエースにする
+  function assignStartAces() {
+    if (state.mode === 'free') return;
+    var lo = [0, TGT0], hi = [TGT0, MAXN];
+    for (var t = 0; t < 2; t++) {
+      if (state.mode === 'chase' && t === 1) break;
+      for (var i = lo[t]; i < hi[t]; i++) {
+        if (air[i].on) { setAce(air[i], true); break; }
+      }
+    }
+  }
+
   // 被弾: 耐久力を1減らす。0になったら撃墜（byTeam: 撃った側のチーム）
-  function hitTarget(a, byTeam, dmg) {
+  function hitTarget(a, byTeam, dmg, shooter, sgen) {
     if (a.dead || (a.role !== 'tgt' && a.role !== 'duel')) return;
     var d = dmg === undefined ? 1 : dmg;      // ミサイル1発 = 1、機銃1発 = 0.05
     a.hp -= d;
     a.flash = Math.max(a.flash, d >= 1 ? 1 : 0.6);
-    if (a.hp <= 0) destroyAircraft(a, byTeam);
+    if (a.hp <= 0) destroyAircraft(a, byTeam, shooter, sgen);
   }
-  function destroyAircraft(a, byTeam) {
+  function destroyAircraft(a, byTeam, shooter, sgen) {
     a.dead = true;
     a.fade = 1;
     a.respawnT = state.respawn;    // 設定した時間が経ったら、遠方から補充機が飛来する
@@ -1519,6 +1576,7 @@
     a.flareLeft = 0; a.chaffLeft = 0; a.salvoLeft = 0; a.threat = 1e9;
     var team = byTeam === 0 || byTeam === 1 ? byTeam : 1 - a.team;
     state.score[team]++;
+    creditKill(shooter, sgen);
     explode(a.pos, 2.2);
     for (var k = 0; k < 3; k++) {
       emit(flashP, a.pos.x + rand(-3, 3), a.pos.y + rand(-3, 3), a.pos.z + rand(-3, 3), 0, 0, 0, rand(0.4, 0.6), 1, 0.8, 0.5);
@@ -1624,7 +1682,7 @@
             while (a.salvoLeft > 0 && a.salvoT <= 0) { spawnMissile(a); a.salvoLeft--; a.salvoT += 0.04; }
             if (a.salvoLeft <= 0) a.fireT = rand(5, 8);
           } else if (a.fireT <= 0 && !a.man && a.dist < MISSILE[a.mKind].rMax && a.dist > MISSILE[a.mKind].rMin && a.aim < 0.5) {
-            a.salvoLeft = state.volley;
+            a.salvoLeft = state.volley + (a.ace ? ACE_SALVO : 0);
             a.salvoT = 0;
           }
           if (state.gun && !a.man) {
@@ -1836,9 +1894,7 @@
   bind('hp', 'hp', function (v) { return String(v); }, function () {
     // 設定を変えたとき、生きている標的の耐久力を割合を保ったまま換算する
     for (var i = 0; i < MAXN; i++) {
-      var a = air[i], frac = a.hpMax > 0 ? a.hp / a.hpMax : 1;
-      a.hpMax = state.hp;
-      if (!a.dead) a.hp = Math.max(1, Math.ceil(frac * state.hp - 1e-6));
+      rescaleHp(air[i]);
     }
   });
 
@@ -1865,6 +1921,7 @@
     $('respawnRow').hidden = !battle;
     $('followCamRow').hidden = !battle;
     $('gunRow').hidden = !battle;
+    $('aceRow').hidden = !battle;
     $('nAtkL').textContent = mode === 'duel' ? 'チームAの数' : '攻撃側の数';
     $('nTgtL').textContent = mode === 'duel' ? 'チームBの数' : '逃げる側の数';
     if (!battle && state.followCam) setFollowCam(false);
@@ -1924,7 +1981,7 @@
       if (state.mode === 'duel') who = 'チーム' + (f.team === 0 ? 'A' : 'B') + ' ' + (f.idx % TGT0 + 1) + '番機';
       else if (f.role === 'atk') { who = '攻撃側 ' + (f.idx + 1) + '番機'; noHp = true; }   // 追撃戦の攻撃側は被弾しない
       else who = '標的 ' + (f.idx - TGT0 + 1);
-      text = '追従中: ' + who + (noHp ? '' : '　耐久力 ' + Math.ceil(f.hp - 1e-6) + ' / ' + f.hpMax);
+      text = '追従中: ' + (f.ace ? 'ACE ' : '') + who + (f.ace || f.kills > 0 ? '　撃墜 ' + f.kills : '') + (noHp ? '' : '　耐久力 ' + Math.ceil(f.hp - 1e-6) + ' / ' + f.hpMax);
       pct = noHp ? 100 : f.hp / f.hpMax * 100;
       low = !noHp && pct <= 25;
     } else if (f) {
@@ -1969,6 +2026,12 @@
   gunEl.addEventListener('change', function () {
     state.gun = gunEl.checked;
     if (!state.gun) clearBullets();
+  });
+  var aceEl = $('ace');
+  aceEl.addEventListener('change', function () {
+    state.ace = aceEl.checked;
+    // オフにしたら、すぐ全機が普通に戻る。オンの開始時エースは「最初から」のときに作られる
+    if (!state.ace) for (var i = 0; i < MAXN; i++) setAce(air[i], false);
   });
   var autoNextEl = $('autoNext');
   autoNextEl.addEventListener('change', function () { state.autoNext = autoNextEl.checked; });
