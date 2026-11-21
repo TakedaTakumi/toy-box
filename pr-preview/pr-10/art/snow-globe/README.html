@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>スノードーム</title>
+<style>
+  :root { color-scheme: light dark; --bg:#f4f6fb; --surface:#fff; --ink:#1c2438; --muted:#5d6a85; --line:#dde3ef; --accent:#4f6bed; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#11151f; --surface:#1a2030; --ink:#e8ecf6; --muted:#9aa6c0; --line:#2b3550; --accent:#8da2ff; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); line-height:1.8;
+    font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif; }
+  main { max-width: 52rem; margin: 0 auto; padding: 32px 16px 64px; }
+  nav a { color: var(--accent); }
+  article { margin-top: 16px; padding: 8px 24px 24px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow-wrap: anywhere; }
+  h1 { font-size: 1.6rem; }
+  h2 { margin-top: 2rem; padding-left: 12px; border-left: 4px solid var(--accent); font-size: 1.25rem; }
+  a { color: var(--accent); }
+  code { padding: 1px 5px; border-radius: 4px; background: var(--bg); font-size: .9em; }
+  pre { padding: 12px 16px; border-radius: 8px; background: var(--bg); overflow-x: auto; }
+  pre code { padding: 0; background: none; }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; }
+  th, td { padding: 6px 10px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+  th { background: var(--bg); }
+</style>
+</head>
+<body>
+<main>
+<nav><a href="../../">&larr; toy-box 一覧へ</a> / <a href="./">プロトタイプを開く</a></nav>
+<article>
+<h1>スノードーム 仕様書</h1>
+<ul>
+<li>試作リンク：<a href="https://takedatakumi.github.io/toy-box/art/snow-globe/">https://takedatakumi.github.io/toy-box/art/snow-globe/</a></li>
+</ul>
+<h2>概要と目的</h2>
+<p>スマホのジャイロ（傾き）と加速度（振り）を使って、スノードームを再現したものです。傾けると雪が傾いた側へ流れ、振ると雪が舞い上がります。1つのHTMLファイルで動き、ライブラリは使いません。保存されるデータはありません。</p>
+<p>ジャイロはHTTPSのページでしか動きません。このリポジトリのGitHub Pagesは、HTTPSで公開されます。</p>
+<h2>画面構成と操作</h2>
+<p>画面は、タイトルと状態表示、ドーム、ボタン、ヒントの文で構成します。ドームは、夜空と家と木を入れたガラス球と、台座です。</p>
+<p><strong>スマホ</strong></p>
+<ul>
+<li>傾けると、雪の落ちる向きが変わる</li>
+<li>振ると、雪が舞い上がる。強く振るほど、高く舞う</li>
+<li>縦向きと横向きのどちらでも、傾きの向きが合う</li>
+</ul>
+<p><strong>PC・ジャイロのない環境</strong></p>
+<ul>
+<li>ドームをドラッグすると、ドラッグの向きと速さに応じて雪が動く。素早く動かすほど、雪が舞い上がる</li>
+<li>「ふる」ボタン、またはスペースキーで、振った扱いになる</li>
+</ul>
+<p><strong>状態表示</strong></p>
+<div class="table-wrap"><table><thead><tr>
+<th>表示</th>
+<th>意味</th>
+</tr>
+</thead><tbody><tr>
+<td>「ジャイロを使う」を押すと、傾きで動きます</td>
+<td>iPhoneなど、モーションの許可が必要な環境。ボタンを押すと許可を求める</td>
+</tr>
+<tr>
+<td>ジャイロ: 確認中…</td>
+<td>傾きのイベントが届くのを待っている</td>
+</tr>
+<tr>
+<td>ジャイロ: 使用中</td>
+<td>傾きのイベントが届いている</td>
+</tr>
+<tr>
+<td>ジャイロを検出できません。ドラッグで操作できます</td>
+<td>約1.5秒待っても、傾きの値が届かない</td>
+</tr>
+<tr>
+<td>モーションが許可されていません。ドラッグで操作できます</td>
+<td>許可を断られた</td>
+</tr>
+</tbody></table></div><h2>ジャイロの仕様</h2>
+<p>傾きは <code>deviceorientation</code>、振りは <code>devicemotion</code> から読みます。</p>
+<p><strong>傾き（重力の向き）</strong></p>
+<ul>
+<li><code>beta</code>（前後の傾き）と <code>gamma</code>（左右の傾き）から、画面上の重力の向きを求める。画面の向き（0・90・180・270度）に合わせて回す</li>
+<li>端末を水平に置いたときも、わずかに下向きの重力を足して、雪が完全には止まらないようにする</li>
+<li>向きの変化はなめらかにならして使う</li>
+</ul>
+<p><strong>振り</strong></p>
+<ul>
+<li>重力を除いた加速度の大きさが7m/s²を超えると、振ったとみなす。重力を除いた値が取れない端末では、重力を含む加速度の大きさの変化量で代用する</li>
+<li>強さは、超えた分に応じて決める（上限あり）。連続して反応しないよう、60ミリ秒は間を空ける</li>
+</ul>
+<h2>雪の挙動</h2>
+<p>雪の粒を、ドームの中の2次元の粒子として動かします。</p>
+<ul>
+<li>粒の数は240。大きさは粒ごとに違う</li>
+<li>重力と空気抵抗でゆっくり落ち、横に少しゆれる</li>
+<li>ガラスの内側と、ドームの底（家が立つ雪の地面）で止まる。積もった雪が1点に固まらないよう、粒ごとに積もる高さを変える</li>
+<li>OSの「視差効果を減らす」設定では、粒の数・重力・ゆれを減らす</li>
+</ul>
+<h2>見た目</h2>
+<ul>
+<li>ドームの中は、夜空・月・家・木3本・雪の地面。家の窓は明かりが点いている</li>
+<li>台座は、金色の縁のある木製</li>
+<li>ページの背景と文字は、ライト・ダークに合わせて切り替わる。ドームの中は、どちらでも夜の景色</li>
+</ul>
+<h2>検証状況・制限・保留事項</h2>
+<p><strong>検証した内容</strong></p>
+<ul>
+<li>ヘッドレスのブラウザで、表示・コンソールにエラーが出ないこと・傾きのイベントを入れたときの状態表示の切り替え・振りのイベントで雪が舞うことを確認した</li>
+</ul>
+<p><strong>確認できていないこと</strong></p>
+<ul>
+<li>実機のスマホでの傾きと振りの感触。ヘッドレスのブラウザは、センサーを持たないので、疑似のイベントで確かめた</li>
+<li>iPhoneでの許可ダイアログの表示</li>
+</ul>
+<p><strong>既知の制限</strong></p>
+<ul>
+<li>ジャイロは、HTTPSのページでしか動かない。ファイルを直接開く（<code>file://</code>）と、動かないことがある</li>
+<li>アプリ内のブラウザやアーティファクトの表示領域では、センサーの値が届かないことがある。その場合はドラッグで操作する</li>
+<li>ドームの中の景色は、画面に固定している。端末を傾けても、ドームの絵は傾かず、雪の向きだけが変わる</li>
+</ul>
+
+</article>
+</main>
+</body>
+</html>
