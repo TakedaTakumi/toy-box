@@ -937,7 +937,8 @@
     g.setAttribute('color', P.ca);
     P.pts = new THREE.Points(g, new THREE.PointsMaterial({
       size: size, map: dotTex, vertexColors: true, transparent: true,
-      blending: THREE.AdditiveBlending, depthWrite: false
+      blending: THREE.AdditiveBlending, depthWrite: false,
+      fog: false   // 未使用の粒(黒)が原点に重なり、霧の色が加算されて光る玉になるのを防ぐ
     }));
     P.pts.frustumCulled = false;
     scene.add(P.pts);
