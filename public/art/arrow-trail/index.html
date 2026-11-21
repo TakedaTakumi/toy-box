@@ -897,6 +897,12 @@
 
   /* ---------- 追撃戦（ミサイル・フレア・爆発） ---------- */
   var MAXM = 320, MTRAIL = 160, MAXF = 160;
+
+  // 誘導方式ごとのミサイル性能。熱誘導はフレア、レーダー誘導はチャフにだけ惑わされる
+  var MISSILE = {
+    ir:    { burn: [1.6, 2.2], nmax: [12, 15], thrust: 42, life: [5, 6.5], rMin: 35, rMax: 150, head: [1, 0.78, 0.55] },
+    radar: { burn: [2.4, 3.2], nmax: [8, 10], thrust: 48, life: [7, 9], rMin: 50, rMax: 230, head: [0.6, 0.9, 1] }
+  };
   var _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3();
   var _v4 = new THREE.Vector3(), _v5 = new THREE.Vector3();
   var _e1 = new THREE.Vector3(), _e2 = new THREE.Vector3(), _en = new THREE.Vector3();
@@ -966,6 +972,7 @@
   var flashP = makeParticles(80, 16);
   var mHeads = makeParticles(MAXM, 3.4);
   var fHeads = makeParticles(MAXF, 7);
+  var cHeads = makeParticles(MAXF, 9);
 
   function explode(p, s) {
     emit(flashP, p.x, p.y, p.z, 0, 0, 0, 0.35, 1, 0.9, 0.7);
@@ -994,7 +1001,7 @@
   var missiles = [];
   function makeMissile() {
     var m = {
-      alive: false, fade: 0, age: 0, cnt: 0, tgt: null, flare: null, fool: false,
+      alive: false, fade: 0, age: 0, cnt: 0, tgt: null, flare: null, fool: false, kind: 'ir',
       pos: new THREE.Vector3(), dir: new THREE.Vector3(1, 0, 0), last: new THREE.Vector3()
     };
     m.tp = new Float32Array(MTRAIL * 3);
@@ -1065,6 +1072,35 @@
     if (f.pos.y < H(f.pos.x, f.pos.z)) f.life = 0;
   }
 
+  /* チャフ: フレアより長く漂い、レーダー誘導のミサイルだけを惑わす */
+  var chaffs = [];
+  for (var ci = 0; ci < MAXF; ci++) {
+    chaffs.push({ life: 0, mlife: 1, acc: 0, owner: null, pos: new THREE.Vector3(), vel: new THREE.Vector3() });
+  }
+  function spawnChaff(a) {
+    var c = null;
+    for (var q = 0; q < MAXF; q++) { if (chaffs[q].life <= 0) { c = chaffs[q]; break; } }
+    if (!c) return;
+    c.owner = a; c.life = 3.0; c.mlife = 3.0; c.acc = 0;
+    c.pos.copy(a.pos).addScaledVector(a.fwd, -2);
+    c.vel.copy(a.fwd).multiplyScalar(a.speed * 0.25)
+      .addScaledVector(a.rt, rand(-1, 1) * 10)
+      .addScaledVector(a.upv, rand(-1, 1) * 10);
+  }
+  function stepChaff(c, h) {
+    if (c.life <= 0) return;
+    c.life -= h;
+    c.vel.multiplyScalar(Math.exp(-1.6 * h));
+    c.vel.y -= 2 * h;
+    c.pos.addScaledVector(c.vel, h);
+    c.acc += h;
+    if (c.acc > 0.04) {
+      c.acc = 0;
+      emit(sparkP, c.pos.x, c.pos.y, c.pos.z, rand(-3, 3), rand(-3, 3), rand(-3, 3), 1.1, 0.6, 1, 0.8);
+    }
+    if (c.pos.y < H(c.pos.x, c.pos.z)) c.life = 0;
+  }
+
   /* 一斉射: 機首から大きく扇状にばらけて発射する（板野サーカス） */
   function spawnMissile(atk) {
     var m = null;
@@ -1075,6 +1111,8 @@
     m.alive = true; m.fade = 1; m.age = 0; m.cnt = 0;
     m.mat.opacity = 1;
     m.line.visible = true;
+    var K = MISSILE[atk.mKind];
+    m.kind = atk.mKind; m.head = K.head;
     m.tgt = atk.tgt; m.team = atk.team; m.flare = null; m.fool = Math.random() < 0.8;
     m.pos.copy(atk.pos).addScaledVector(atk.rt, rand(-1.5, 1.5)).addScaledVector(atk.upv, -0.6);
     var ang = rand(0, 6.2832), spread = rand(0.5, 1.25);
@@ -1084,13 +1122,13 @@
     m.dir.copy(_v1).normalize();
     if (m.dir.y < -0.25) { m.dir.y = -0.25; m.dir.normalize(); }   // 発射直後に急降下しない
     m.speed = Math.max(atk.speed * 0.9, 28);   // 発射時は機体の速度を引き継ぐ
-    m.burn = rand(2.0, 2.8);                   // 推進剤の燃焼時間
-    m.nmax = rand(9, 12);                      // 最大の旋回G（速度が低いほど小さく曲がれる）
+    m.burn = rand(K.burn[0], K.burn[1]);       // 推進剤の燃焼時間
+    m.nmax = rand(K.nmax[0], K.nmax[1]);       // 最大の旋回G（速度が低いほど小さく曲がれる）
     m.turnRate = 0;
     m.wA = rand(0.8, 2.0);
     m.wf = rand(3, 7) * (Math.random() < 0.5 ? -1 : 1);
     m.ph = rand(0, 6.2832);
-    m.life = rand(6, 8);
+    m.life = rand(K.life[0], K.life[1]);
     for (var i = 0; i < MTRAIL; i++) {
       m.tp[i * 3] = m.pos.x; m.tp[i * 3 + 1] = m.pos.y; m.tp[i * 3 + 2] = m.pos.z;
     }
@@ -1124,11 +1162,11 @@
     m.turnRate = 0;
     if (m.tgt && (!m.tgt.on || m.tgt.dead || m.tgt.arriving)) { m.tgt = nearestEnemy(m.pos, m.team); m.flare = null; }   // 標的が消えた・補充されて飛来中になったら、別の標的を狙う
 
-    // フレアに惑わされる（一度だけ）
+    // 誘導方式に合う囮（熱誘導はフレア、レーダー誘導はチャフ）に惑わされる（一度だけ）
     if (!m.flare && m.fool && m.tgt && m.age > 0.7) {
-      var best = null, bd = 3600;
+      var best = null, bd = 3600, pool = m.kind === 'radar' ? chaffs : flares;
       for (var q = 0; q < MAXF; q++) {
-        var fl = flares[q];
+        var fl = pool[q];
         if (fl.life > 0 && fl.owner === m.tgt) {
           var dd = fl.pos.distanceToSquared(m.pos);
           if (dd < bd) { bd = dd; best = fl; }
@@ -1168,7 +1206,7 @@
       }
     }
     var nm = m.turnRate * m.speed / G;      // 旋回の負荷（G）
-    var macc = (m.age < m.burn ? 42 : 0) - 0.004 * m.speed * m.speed - 0.05 * nm * nm - G * m.dir.y * 0.5;
+    var macc = (m.age < m.burn ? MISSILE[m.kind].thrust : 0) - 0.004 * m.speed * m.speed - 0.05 * nm * nm - G * m.dir.y * 0.5;
     m.speed = Math.max(0, m.speed + macc * dt);
     m.pos.addScaledVector(m.dir, m.speed * dt);
 
@@ -1325,6 +1363,7 @@
     a.threat = 1e9; a.dist = 1e9; a.aim = 3;
     a.salvoLeft = 0; a.salvoT = 0; a.fireT = rand(0.5, 2.5);
     a.flareT = 0; a.flareLeft = 0; a.flareGap = 0;
+    a.chaffT = 0; a.chaffLeft = 0; a.chaffGap = 0; a.threatKind = 'ir';
     a.retargetT = 0;
     a.gunBurst = 0; a.gunCool = rand(0.5, 1.5); a.gunAcc = 0; a.gunD = 1e9; a.gunErr = 3; a.gunThreat = 1e9;
   }
@@ -1386,6 +1425,7 @@
     a.gen++;
     a.dead = false; a.fade = 0; a.flash = 0; a.arriving = false;
     a.hpMax = state.hp; a.hp = state.hp;
+    a.mKind = Math.random() < 0.5 ? 'ir' : 'radar';    // 機体ごとに生成時に決めて固定する
     a.trailMat.opacity = 1;
     a.ribbon.visible = true;
     a.arrow.visible = true; a.drop.visible = true;
@@ -1472,7 +1512,7 @@
     leaveGhost(a);                 // 軌跡は別枠に移して、補充機とは関係なく薄れさせる
     a.ribbon.visible = false;
     a.man = null; a.direct = null;
-    a.flareLeft = 0; a.salvoLeft = 0; a.threat = 1e9;
+    a.flareLeft = 0; a.chaffLeft = 0; a.salvoLeft = 0; a.threat = 1e9;
     var team = byTeam === 0 || byTeam === 1 ? byTeam : 1 - a.team;
     state.score[team]++;
     explode(a.pos, 2.2);
@@ -1521,18 +1561,18 @@
   }
 
   function clearBattle() {
-    var i, Ps = [sparkP, flashP, mHeads, fHeads];
+    var i, Ps = [sparkP, flashP, mHeads, fHeads, cHeads];
     for (i = 0; i < MAXM; i++) {
       missiles[i].alive = false; missiles[i].fade = 0;
       missiles[i].mat.opacity = 0; missiles[i].line.visible = false;
     }
-    for (i = 0; i < MAXF; i++) flares[i].life = 0;
+    for (i = 0; i < MAXF; i++) { flares[i].life = 0; chaffs[i].life = 0; }
     for (i = 0; i < Ps.length; i++) {
       Ps[i].life.fill(0); Ps[i].col.fill(0); Ps[i].ca.needsUpdate = true;
     }
     for (i = 0; i < MAXN; i++) {
       var a = air[i];
-      a.salvoLeft = 0; a.flareLeft = 0; a.evade = 0; a.threat = 1e9;
+      a.salvoLeft = 0; a.flareLeft = 0; a.chaffLeft = 0; a.evade = 0; a.threat = 1e9;
     }
     for (i = 0; i < MAXG; i++) { GHOSTS[i].fade = 0; GHOSTS[i].mesh.visible = false; }
     state.score = [0, 0];
@@ -1548,6 +1588,7 @@
         var d = m.pos.distanceTo(m.tgt.pos);
         if (d < m.tgt.threat) {
           m.tgt.threat = d;
+          m.tgt.threatKind = m.kind;
           m.tgt.threatDir.subVectors(m.pos, m.tgt.pos).divideScalar(d || 1);
         }
       }
@@ -1578,7 +1619,7 @@
             a.salvoT -= h;
             while (a.salvoLeft > 0 && a.salvoT <= 0) { spawnMissile(a); a.salvoLeft--; a.salvoT += 0.04; }
             if (a.salvoLeft <= 0) a.fireT = rand(5, 8);
-          } else if (a.fireT <= 0 && !a.man && a.dist < 170 && a.dist > 35 && a.aim < 0.5) {
+          } else if (a.fireT <= 0 && !a.man && a.dist < MISSILE[a.mKind].rMax && a.dist > MISSILE[a.mKind].rMin && a.aim < 0.5) {
             a.salvoLeft = state.volley;
             a.salvoT = 0;
           }
@@ -1601,14 +1642,21 @@
         if (a.flareLeft > 0) {
           a.flareGap -= h;
           if (a.flareGap <= 0) { spawnFlare(a); a.flareLeft--; a.flareGap = 0.09; }
-        } else if (a.flareT <= 0 && a.threat < 100) {
+        } else if (a.flareT <= 0 && a.threat < 100 && a.threatKind !== 'radar') {
           a.flareLeft = 6; a.flareGap = 0; a.flareT = 2.2;
+        }
+        a.chaffT -= h;
+        if (a.chaffLeft > 0) {
+          a.chaffGap -= h;
+          if (a.chaffGap <= 0) { spawnChaff(a); a.chaffLeft--; a.chaffGap = 0.09; }
+        } else if (a.chaffT <= 0 && a.threat < 100 && a.threatKind === 'radar') {
+          a.chaffLeft = 6; a.chaffGap = 0; a.chaffT = 2.2;
         }
       }
     }
     for (i = 0; i < MAXG; i++) stepGhost(GHOSTS[i], h);
     for (i = 0; i < MAXM; i++) stepMissile(missiles[i], h);
-    for (i = 0; i < MAXF; i++) stepFlare(flares[i], h);
+    for (i = 0; i < MAXF; i++) { stepFlare(flares[i], h); stepChaff(chaffs[i], h); }
     stepBullets(h);
   }
 
@@ -1618,7 +1666,7 @@
       m = missiles[i]; o = i * 3;
       if (m.alive) {
         mHeads.pos[o] = m.pos.x; mHeads.pos[o + 1] = m.pos.y; mHeads.pos[o + 2] = m.pos.z;
-        mHeads.col[o] = 0.95; mHeads.col[o + 1] = 0.97; mHeads.col[o + 2] = 1;
+        mHeads.col[o] = m.head[0]; mHeads.col[o + 1] = m.head[1]; mHeads.col[o + 2] = m.head[2];
         updTrail(m);
       } else {
         mHeads.col[o] = 0; mHeads.col[o + 1] = 0; mHeads.col[o + 2] = 0;
@@ -1636,6 +1684,17 @@
       }
     }
     fHeads.pa.needsUpdate = true; fHeads.ca.needsUpdate = true;
+    for (i = 0; i < MAXF; i++) {
+      f = chaffs[i]; o = i * 3;
+      if (f.life > 0) {
+        k = Math.min(1, f.life / f.mlife * 2);
+        cHeads.pos[o] = f.pos.x; cHeads.pos[o + 1] = f.pos.y; cHeads.pos[o + 2] = f.pos.z;
+        cHeads.col[o] = 0.6 * k; cHeads.col[o + 1] = k; cHeads.col[o + 2] = 0.8 * k;
+      } else {
+        cHeads.col[o] = 0; cHeads.col[o + 1] = 0; cHeads.col[o + 2] = 0;
+      }
+    }
+    cHeads.pa.needsUpdate = true; cHeads.ca.needsUpdate = true;
     syncBullets();
   }
 
