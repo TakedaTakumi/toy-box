@@ -898,11 +898,13 @@
   /* ---------- 追撃戦（ミサイル・フレア・爆発） ---------- */
   var MAXM = 320, MTRAIL = 160, MAXF = 160;
 
-  // 誘導方式ごとのミサイル性能。熱誘導はフレア、レーダー誘導はチャフにだけ惑わされる
+  // ミサイルの種類ごとの性能。decoy は惑わされる囮、dmg は耐久力の減り、big は命中時の爆発の大きさ、wob は軌道の膨らみの倍率
   var MISSILE = {
-    ir:    { burn: [1.6, 2.2], nmax: [12, 15], thrust: 42, life: [5, 6.5], rMin: 35, rMax: 150, head: [1, 0.78, 0.55] },
-    radar: { burn: [2.4, 3.2], nmax: [8, 10], thrust: 48, life: [7, 9], rMin: 50, rMax: 230, head: [0.6, 0.9, 1] }
+    ir:    { burn: [1.6, 2.2], nmax: [12, 15], thrust: 42, life: [5, 6.5], rMin: 35, rMax: 150, head: [1, 0.78, 0.55], decoy: 'flare', dmg: 1, big: 1, wob: 1 },
+    radar: { burn: [2.4, 3.2], nmax: [8, 10], thrust: 48, life: [7, 9], rMin: 50, rMax: 230, head: [0.6, 0.9, 1], decoy: 'chaff', dmg: 1, big: 1, wob: 1 },
+    heavy: { burn: [3, 4], nmax: [3, 4], thrust: 50, life: [8, 10], rMin: 60, rMax: 200, head: [1, 0.45, 0.25], decoy: null, dmg: 2, big: 1.8, wob: 0.25 }
   };
+  var MISSILE_KINDS = ['ir', 'radar', 'heavy'];
   var _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3();
   var _v4 = new THREE.Vector3(), _v5 = new THREE.Vector3();
   var _e1 = new THREE.Vector3(), _e2 = new THREE.Vector3(), _en = new THREE.Vector3();
@@ -971,6 +973,7 @@
   var sparkP = makeParticles(6000, 3.2);
   var flashP = makeParticles(80, 16);
   var mHeads = makeParticles(MAXM, 3.4);
+  var hvHeads = makeParticles(MAXM, 8);
   var fHeads = makeParticles(MAXF, 7);
   var cHeads = makeParticles(MAXF, 9);
 
@@ -1113,7 +1116,7 @@
     m.line.visible = true;
     var K = MISSILE[atk.mKind];
     m.kind = atk.mKind; m.head = K.head;
-    m.tgt = atk.tgt; m.team = atk.team; m.flare = null; m.fool = Math.random() < 0.8;
+    m.tgt = atk.tgt; m.team = atk.team; m.flare = null; m.fool = !!K.decoy && Math.random() < 0.8;
     m.pos.copy(atk.pos).addScaledVector(atk.rt, rand(-1.5, 1.5)).addScaledVector(atk.upv, -0.6);
     var ang = rand(0, 6.2832), spread = rand(0.5, 1.25);
     _v1.copy(atk.rt).multiplyScalar(Math.cos(ang) * Math.sin(spread))
@@ -1125,7 +1128,7 @@
     m.burn = rand(K.burn[0], K.burn[1]);       // 推進剤の燃焼時間
     m.nmax = rand(K.nmax[0], K.nmax[1]);       // 最大の旋回G（速度が低いほど小さく曲がれる）
     m.turnRate = 0;
-    m.wA = rand(0.8, 2.0);
+    m.wA = rand(0.8, 2.0) * K.wob;
     m.wf = rand(3, 7) * (Math.random() < 0.5 ? -1 : 1);
     m.ph = rand(0, 6.2832);
     m.life = rand(K.life[0], K.life[1]);
@@ -1164,7 +1167,7 @@
 
     // 誘導方式に合う囮（熱誘導はフレア、レーダー誘導はチャフ）に惑わされる（一度だけ）
     if (!m.flare && m.fool && m.tgt && m.age > 0.7) {
-      var best = null, bd = 3600, pool = m.kind === 'radar' ? chaffs : flares;
+      var best = null, bd = 3600, pool = MISSILE[m.kind].decoy === 'chaff' ? chaffs : flares;
       for (var q = 0; q < MAXF; q++) {
         var fl = pool[q];
         if (fl.life > 0 && fl.owner === m.tgt) {
@@ -1199,8 +1202,8 @@
       turnToward(m.dir, _v4, wmax * dt);
       m.turnRate = Math.acos(clamp(_v1.dot(m.dir), -1, 1)) / Math.max(dt, 1e-6);
       if (dist < (m.flare ? 4 : 3.5)) {
-        explode(m.pos, m.flare ? 0.6 : 1);
-        if (!m.flare && m.tgt) hitTarget(m.tgt, m.team);
+        explode(m.pos, m.flare ? 0.6 : MISSILE[m.kind].big);
+        if (!m.flare && m.tgt) hitTarget(m.tgt, m.team, MISSILE[m.kind].dmg);
         killMissile(m);
         return;
       }
@@ -1425,7 +1428,7 @@
     a.gen++;
     a.dead = false; a.fade = 0; a.flash = 0; a.arriving = false;
     a.hpMax = state.hp; a.hp = state.hp;
-    a.mKind = Math.random() < 0.5 ? 'ir' : 'radar';    // 機体ごとに生成時に決めて固定する
+    a.mKind = MISSILE_KINDS[Math.floor(Math.random() * MISSILE_KINDS.length)];    // 機体ごとに生成時に決めて固定する
     a.trailMat.opacity = 1;
     a.ribbon.visible = true;
     a.arrow.visible = true; a.drop.visible = true;
@@ -1561,7 +1564,7 @@
   }
 
   function clearBattle() {
-    var i, Ps = [sparkP, flashP, mHeads, fHeads, cHeads];
+    var i, Ps = [sparkP, flashP, mHeads, hvHeads, fHeads, cHeads];
     for (i = 0; i < MAXM; i++) {
       missiles[i].alive = false; missiles[i].fade = 0;
       missiles[i].mat.opacity = 0; missiles[i].line.visible = false;
@@ -1642,14 +1645,14 @@
         if (a.flareLeft > 0) {
           a.flareGap -= h;
           if (a.flareGap <= 0) { spawnFlare(a); a.flareLeft--; a.flareGap = 0.09; }
-        } else if (a.flareT <= 0 && a.threat < 100 && a.threatKind !== 'radar') {
+        } else if (a.flareT <= 0 && a.threat < 100 && MISSILE[a.threatKind].decoy === 'flare') {
           a.flareLeft = 6; a.flareGap = 0; a.flareT = 2.2;
         }
         a.chaffT -= h;
         if (a.chaffLeft > 0) {
           a.chaffGap -= h;
           if (a.chaffGap <= 0) { spawnChaff(a); a.chaffLeft--; a.chaffGap = 0.09; }
-        } else if (a.chaffT <= 0 && a.threat < 100 && a.threatKind === 'radar') {
+        } else if (a.chaffT <= 0 && a.threat < 100 && MISSILE[a.threatKind].decoy === 'chaff') {
           a.chaffLeft = 6; a.chaffGap = 0; a.chaffT = 2.2;
         }
       }
@@ -1664,15 +1667,19 @@
     var i, o, m, f, k;
     for (i = 0; i < MAXM; i++) {
       m = missiles[i]; o = i * 3;
+      // 重爆型は、大きな点を描く別枠に入れる
+      var H1 = m.alive && m.kind === 'heavy' ? hvHeads : mHeads, H0 = H1 === mHeads ? hvHeads : mHeads;
+      H0.col[o] = 0; H0.col[o + 1] = 0; H0.col[o + 2] = 0;
       if (m.alive) {
-        mHeads.pos[o] = m.pos.x; mHeads.pos[o + 1] = m.pos.y; mHeads.pos[o + 2] = m.pos.z;
-        mHeads.col[o] = m.head[0]; mHeads.col[o + 1] = m.head[1]; mHeads.col[o + 2] = m.head[2];
+        H1.pos[o] = m.pos.x; H1.pos[o + 1] = m.pos.y; H1.pos[o + 2] = m.pos.z;
+        H1.col[o] = m.head[0]; H1.col[o + 1] = m.head[1]; H1.col[o + 2] = m.head[2];
         updTrail(m);
       } else {
-        mHeads.col[o] = 0; mHeads.col[o + 1] = 0; mHeads.col[o + 2] = 0;
+        H1.col[o] = 0; H1.col[o + 1] = 0; H1.col[o + 2] = 0;
       }
     }
     mHeads.pa.needsUpdate = true; mHeads.ca.needsUpdate = true;
+    hvHeads.pa.needsUpdate = true; hvHeads.ca.needsUpdate = true;
     for (i = 0; i < MAXF; i++) {
       f = flares[i]; o = i * 3;
       if (f.life > 0) {
