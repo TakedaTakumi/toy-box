@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>矢印の軌跡（飛行モデル版）</title>
+<title>やじるしコンバット</title>
 <style>
   :root { color-scheme: light dark; --bg:#f4f6fb; --surface:#fff; --ink:#1c2438; --muted:#5d6a85; --line:#dde3ef; --accent:#4f6bed; }
   @media (prefers-color-scheme: dark) {
@@ -31,14 +31,14 @@
 <main>
 <nav><a href="../../">&larr; toy-box 一覧へ</a> / <a href="./">プロトタイプを開く</a></nav>
 <article>
-<h1>矢印の軌跡（飛行モデル版）仕様書</h1>
+<h1>やじるしコンバット 仕様書</h1>
 <ul>
 <li>試作リンク：<a href="https://takedatakumi.github.io/toy-box/art/arrow-trail/">https://takedatakumi.github.io/toy-box/art/arrow-trail/</a></li>
 </ul>
 <h2>概要と目的</h2>
 <p>エースコンバットのリザルト画面にある「矢印で描いた機体の軌跡」を、ブラウザで眺めて楽しむ3Dアニメーションとして再現し、ミサイル戦まで広げたものです。</p>
 <p>矢印の機体が飛び回り、後ろに帯状の軌跡を引きます。モードを切り替えると、攻撃側が標的を追ってミサイルを一斉射する「追撃戦」と、2チームが互いに攻撃し合う「交戦」を眺められます。1つのHTMLファイルで動き、Three.js（r128）で描画します。保存されるデータはありません。</p>
-<p>飛行モデル版（<a href="./">矢印の軌跡</a>）の仕様を書いています。機体座標系の飛行モデル、スロットル、交戦モード、耐久力と撃墜、補充、真上カメラを備えます。</p>
+<p><a href="./">やじるしコンバット</a>の仕様を書いています。機体座標系の飛行モデル、スロットル、交戦モード、耐久力と撃墜、補充、真上カメラを備えます。</p>
 <h2>画面構成と操作</h2>
 <p>画面は、全面の3D表示と、右下の設定パネルで構成します。モードは3つ、視点は2つあり、追従カメラは独立したスイッチです。</p>
 <p><strong>モード</strong></p>
