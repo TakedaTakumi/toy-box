@@ -80,7 +80,7 @@
   }
   canvas {
     display: block;
-    width: min(100%, 520px, calc((100svh - 190px) * 500 / 560));
+    width: min(100%, 520px, calc((100svh - 230px) * 500 / 560));
     height: auto;
     aspect-ratio: 500 / 560;
     touch-action: none;
@@ -100,6 +100,9 @@
     cursor: pointer;
   }
   button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+  .amount { display: flex; align-items: center; gap: 10px; width: min(100%, 360px); color: var(--muted); font-size: .85rem; }
+  .amount input { flex: 1; min-width: 0; accent-color: var(--btn); }
+  .amount output { min-width: 3ch; text-align: right; font-variant-numeric: tabular-nums; }
   .hint { margin: 0; color: var(--muted); font-size: .8rem; text-align: center; }
 </style>
 </head>
@@ -110,6 +113,10 @@
     <span id="status" role="status" aria-live="polite">ジャイロ: 確認中…</span>
   </header>
   <div id="stage"><canvas id="globe" aria-label="スノードーム。傾けたり振ったりすると雪が舞います"></canvas></div>
+  <label class="amount" for="amount">雪の量
+    <input id="amount" type="range" min="50" max="600" step="10" value="240">
+    <output id="amountOut" for="amount">240</output>
+  </label>
   <div class="controls">
     <button id="enable" type="button" hidden>ジャイロを使う</button>
     <button id="shake" type="button">ふる</button>
@@ -124,6 +131,7 @@
   const GLASS = 4, PILE = 9;
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const COUNT = reduceMotion ? 110 : 240;
+  const COUNT_MAX = reduceMotion ? 300 : 600;
   const GRAVITY = reduceMotion ? 70 : 100;
   const SWAY = reduceMotion ? 8 : 38;
 
@@ -340,11 +348,32 @@
       if (y < FLOOR - 8) return [x, y];
     }
   }
-  for (let i = 0; i < COUNT; i++) {
-    const [x, y] = randomInside();
+  function spawnTop() {
+    for (;;) {
+      const x = CX + (Math.random() * 2 - 1) * R, y = CY - R + 14 + Math.random() * R * 0.55;
+      if (Math.hypot(x - CX, y - CY) < R - 14) return [x, y];
+    }
+  }
+  function addFlake(x, y) {
     const r = 1.1 + Math.random() * 2.1;
     flakes.push({ x, y, vx: 0, vy: 0, r, ph: Math.random() * 20, fx: 0.5 + Math.random() * 0.9, fy: 0.6 + Math.random() * 0.8, k: 2.8 - (r - 1.1) / 2.1, stir: 0, sd: 0.22 + Math.random() * 0.2, lift: Math.random() });
   }
+  function setCount(n, fromTop) {
+    while (flakes.length < n) addFlake(...(fromTop ? spawnTop() : randomInside()));
+    flakes.length = n;
+  }
+  setCount(COUNT, false);
+
+  const amountEl = document.getElementById('amount');
+  const amountOut = document.getElementById('amountOut');
+  amountEl.max = COUNT_MAX;
+  amountEl.value = COUNT;
+  amountOut.textContent = COUNT;
+  amountEl.addEventListener('input', () => {
+    const n = Number(amountEl.value);
+    amountOut.textContent = n;
+    setCount(n, true);
+  });
 
   function shake(strength) {
     for (const p of flakes) {
