@@ -611,6 +611,8 @@
   cruise.dt = 0.016;
 
   // 攻撃側: 標的を先読みして追う。近づきすぎたら上昇して距離を取る
+  var EXT_NEAR = 1.0, EXT_BACK = 1.6, EXT_MAX = 3;   // 離れ始める距離・戻る距離（ミサイルの最短距離に対する倍率）、離れる最長の秒数
+
   function pursuit(a, dt) {
     var T = a.tgt;
     _hv.subVectors(T.pos, a.pos);
@@ -626,12 +628,26 @@
       if (dist < GUN_RANGE * 1.3) _dd.copy(_gv);
     }
     a.pLim = 3.0; a.nLim = 4.0; a.bankLim = 1.6;
+    // 位置取り: ミサイルが撃てる状態（機銃オフなら常に）は、ミサイルの発射距離に合う帯を保つ
+    var K = MISSILE[a.mKind], near = K.rMin * EXT_NEAR, far = K.rMax * 0.85;
+    var band = a.fireT <= 0 && a.salvoLeft <= 0 || !state.gun;
+    if (band && a.extend <= 0 && dist < near) a.extend = EXT_MAX;     // 近すぎたら、いったん離れる
+    if (a.extend > 0) {
+      a.extend -= dt;
+      if (!band || dist >= K.rMin * EXT_BACK) a.extend = 0;           // 十分離れたら、機首を標的へ戻す
+    }
+    if (a.extend > 0) {
+      _dd.copy(_hv).multiplyScalar(-1 / dist).addScaledVector(UP, 0.25).normalize();
+      a.thrCmd = 1.3;
+      a.dd.copy(_dd);
+      return;
+    }
     if (dist < (state.gun ? 20 : 32)) a.yoyo = 1.2;
     if (a.yoyo > 0) {
       a.yoyo -= dt;
       _dd.copy(a.fwd).multiplyScalar(0.5).addScaledVector(UP, 0.9).normalize();
       a.thrCmd = a.speed > 26 ? 0.1 : 0.6;
-    } else if (dist > 100) a.thrCmd = 1.3;
+    } else if (dist > (band ? Math.min(100, far) : 100)) a.thrCmd = 1.3;
     else a.thrCmd = cruiseThr(a, T.speed * 1.08);
     a.dd.copy(_dd);
   }
@@ -1401,7 +1417,7 @@
 
   function initCombat(a) {
     a.threat = 1e9; a.dist = 1e9; a.aim = 3;
-    a.salvoLeft = 0; a.salvoT = 0; a.fireT = rand(0.5, 2.5);
+    a.salvoLeft = 0; a.salvoT = 0; a.fireT = rand(0.5, 2.5); a.extend = 0;
     a.flareT = 0; a.flareLeft = 0; a.flareGap = 0;
     a.chaffT = 0; a.chaffLeft = 0; a.chaffGap = 0; a.threatKind = 'ir';
     a.retargetT = 0;
