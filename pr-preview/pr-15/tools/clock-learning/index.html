@@ -123,6 +123,21 @@ h1 { margin: 4px 0 8px; font-size: 1.3rem; text-align: center; }
 .step.h { box-shadow: inset 0 -3px 0 var(--hour); }
 .step.m { box-shadow: inset 0 -3px 0 var(--minute); }
 
+.sync-btn {
+  display: block;
+  margin: 14px auto 0;
+  min-height: 44px;
+  padding: 8px 20px;
+  border: 0;
+  border-radius: 22px;
+  background: var(--minute);
+  color: var(--on-accent);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.sync-btn:disabled { opacity: .35; cursor: not-allowed; }
+.sync-btn:focus-visible { outline: 3px solid var(--hour); outline-offset: 2px; }
 .opts { display: flex; flex-wrap: wrap; gap: 8px 20px; justify-content: center; margin-top: 14px; color: var(--muted); font-size: .9rem; }
 .opt { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; cursor: pointer; }
 .opt input { width: 20px; height: 20px; }
@@ -188,6 +203,7 @@ h1 { margin: 4px 0 8px; font-size: 1.3rem; text-align: center; }
       <div class="label">びょう</div>
     </div>
   </div>
+  <button class="sync-btn" id="sync-btn" type="button" disabled>いまのじかんにあわせる</button>
   <div class="opts">
     <label class="opt"><input type="checkbox" id="opt-24"> 24じかんひょうじ</label>
     <label class="opt"><input type="checkbox" id="opt-minlabel" checked> 「ふん」のすうじ</label>
@@ -287,7 +303,7 @@ h1 { margin: 4px 0 8px; font-size: 1.3rem; text-align: center; }
     crownBtn: $('crown-btn'),
     status: $('status'),
     dh: $('d-h'), dm: $('d-m'), ds: $('d-s'), ampm: $('ampm'),
-    steps: ['h-up', 'h-down', 'm-up', 'm-down'].map($),
+    steps: ['h-up', 'h-down', 'm-up', 'm-down', 'sync-btn'].map($),
   };
 
   let lastKey = '';
@@ -357,6 +373,14 @@ h1 { margin: 4px 0 8px; font-size: 1.3rem; text-align: center; }
     if (!state.pulled) return;
     const m = Math.floor(state.frozenMs / MIN) % 60;
     state.frozenMs = mod(state.frozenMs + (mod(m + delta, 60) - m) * MIN, DAY);
+  }
+
+  function syncToNow() {
+    if (!state.pulled) return;
+    state.frozenMs = localMsOfDay();
+    setPulled(false);
+    state.offsetMs = 0;
+    render(true);
   }
 
   function turnCrown(minutes) {
@@ -462,6 +486,7 @@ h1 { margin: 4px 0 8px; font-size: 1.3rem; text-align: center; }
   setupStepButton('h-down', () => addHours(-1));
   setupStepButton('m-up', () => addMinuteDigitOnly(1));
   setupStepButton('m-down', () => addMinuteDigitOnly(-1));
+  $('sync-btn').addEventListener('click', syncToNow);
   el.crownBtn.addEventListener('click', () => setPulled(!state.pulled));
   $('opt-24').addEventListener('change', (e) => { state.use24 = e.target.checked; render(true); });
   $('opt-minlabel').addEventListener('change', (e) => {
