@@ -131,6 +131,18 @@
     margin: 8px 0 0;
     accent-color: var(--cyan);
   }
+  .row input[type="number"] {
+    width: 5.5rem;
+    box-sizing: border-box;
+    padding: 6px 8px;
+    color: var(--cyan);
+    background: rgba(8, 16, 28, 0.76);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    font: inherit;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
   .check {
     display: flex;
     align-items: center;
@@ -231,6 +243,10 @@
       <label for="area">戦闘領域の広さ</label><output id="areaV"></output>
       <input id="area" type="range" min="0.5" max="3" step="0.25" value="1">
     </div>
+    <div class="row">
+      <label for="seed">地形のシード</label>
+      <input id="seed" type="number" min="0" max="9999" step="1" value="1" inputmode="numeric">
+    </div>
     <div class="row" id="volleyRow" hidden>
       <label for="volley">一斉射の数</label><output id="volleyV"></output>
       <input id="volley" type="range" min="3" max="16" step="1" value="9">
@@ -266,6 +282,7 @@
 <div class="fallback" id="fallback" hidden>このブラウザでは3D表示（WebGL）を利用できません。</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="terrain.js"></script>
 <script>
 (function () {
   'use strict';
@@ -282,7 +299,7 @@
   function rand(a, b) { return a + Math.random() * (b - a); }
 
   var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var state = { count: 8, speed: 1, len: 450, size: 1.5, auto: !reduceMotion, terrain: true, paused: false, volley: 9, mode: 'free', view: 'oblique', nAtk: 4, nTgt: 4, hp: 4, autoNext: false, followObj: null, followGen: 0, followCam: false, followTeam: 'B', respawn: 0, score: [0, 0], gun: true, ace: true, area: 1 };
+  var state = { count: 8, speed: 1, len: 450, size: 1.5, auto: !reduceMotion, terrain: true, paused: false, volley: 9, mode: 'free', view: 'oblique', nAtk: 4, nTgt: 4, hp: 4, autoNext: false, followObj: null, followGen: 0, followCam: false, followTeam: 'B', respawn: 0, score: [0, 0], gun: true, ace: true, area: 1, seed: 1 };
 
   var renderer;
   try {
@@ -300,13 +317,8 @@
   var camera = new THREE.PerspectiveCamera(48, 1, 1, 2000);
 
   /* ---------- 地形（ワイヤーフレーム） ---------- */
-  function H(x, z) {
-    var h = 12
-      + 9 * Math.sin(0.035 * x + 1.3) * Math.cos(0.03 * z)
-      + 5 * Math.sin(0.08 * x - 0.06 * z)
-      + 2.5 * Math.sin(0.13 * z + 0.05 * x);
-    return Math.max(0, h);
-  }
+  // 地形の高さ（terrain.js）。シードを変えたときは、makeHeight で作り直す
+  var H = Terrain.makeHeight(1);
 
   // 地形の線。広さと格子の間隔を倍率で変えて、頂点の数は変えない
   function buildTerrainGeometry(scale) {
@@ -1913,6 +1925,16 @@
     areaPrev = state.area;
   }
   bind('area', 'area', function (v) { return '×' + v.toFixed(2); }, setArea);
+
+  // 地形のシード: 描画と物理の高さが、すぐ新しい地形になる。機体の配置は変わらない
+  var seedEl = $('seed');
+  seedEl.addEventListener('change', function () {
+    state.seed = Terrain.sanitizeSeed(seedEl.value);
+    seedEl.value = String(state.seed);
+    H = Terrain.makeHeight(state.seed);
+    terrain.geometry.dispose();
+    terrain.geometry = buildTerrainGeometry(state.area);
+  });
 
   var autoEl = $('auto');
   autoEl.checked = state.auto;
