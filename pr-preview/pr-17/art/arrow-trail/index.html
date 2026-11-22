@@ -245,7 +245,7 @@
     </div>
     <div class="row">
       <label for="seed">地形のシード</label>
-      <input id="seed" type="number" min="0" max="9999" step="1" value="1" inputmode="numeric">
+      <input id="seed" type="number" min="0" max="9999" step="1" inputmode="numeric">
     </div>
     <div class="row" id="volleyRow" hidden>
       <label for="volley">一斉射の数</label><output id="volleyV"></output>
@@ -299,7 +299,7 @@
   function rand(a, b) { return a + Math.random() * (b - a); }
 
   var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var state = { count: 8, speed: 1, len: 450, size: 1.5, auto: !reduceMotion, terrain: true, paused: false, volley: 9, mode: 'free', view: 'oblique', nAtk: 4, nTgt: 4, hp: 4, autoNext: false, followObj: null, followGen: 0, followCam: false, followTeam: 'B', respawn: 0, score: [0, 0], gun: true, ace: true, area: 1, seed: 1 };
+  var state = { count: 8, speed: 1, len: 450, size: 1.5, auto: !reduceMotion, terrain: true, paused: false, volley: 9, mode: 'free', view: 'oblique', nAtk: 4, nTgt: 4, hp: 4, autoNext: false, followObj: null, followGen: 0, followCam: false, followTeam: 'B', respawn: 0, score: [0, 0], gun: true, ace: true, area: 1, seed: Math.floor(Math.random() * (Terrain.SEED_MAX + 1)) };   // 地形のシードは、開くたびにランダム
 
   var renderer;
   try {
@@ -318,7 +318,7 @@
 
   /* ---------- 地形（ワイヤーフレーム） ---------- */
   // 地形の高さ（terrain.js）。シードを変えたときは、makeHeight で作り直す
-  var H = Terrain.makeHeight(1);
+  var H = Terrain.makeHeight(state.seed);
 
   // 地形の線。広さと格子の間隔を倍率で変えて、頂点の数は変えない
   function buildTerrainGeometry(scale) {
@@ -1928,6 +1928,7 @@
 
   // 地形のシード: 描画と物理の高さが、すぐ新しい地形になる。機体の配置は変わらない
   var seedEl = $('seed');
+  seedEl.value = String(state.seed);
   seedEl.addEventListener('change', function () {
     state.seed = Terrain.sanitizeSeed(seedEl.value);
     seedEl.value = String(state.seed);
