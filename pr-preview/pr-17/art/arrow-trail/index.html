@@ -268,6 +268,10 @@
       </fieldset>
       <div class="actions"><button id="nextTarget" type="button">次の機体</button></div>
       <label class="check"><input id="autoNext" type="checkbox">撃墜されたら自動で次の機体へ</label>
+      <div class="row" id="followDelayRow" hidden>
+        <label for="followDelay">切り替えまでの間隔</label><output id="followDelayV"></output>
+        <input id="followDelay" type="range" min="0" max="5" step="0.5" value="2">
+      </div>
     </div>
     <label class="check"><input id="auto" type="checkbox">カメラを自動で回す</label>
     <label class="check"><input id="terrain" type="checkbox" checked>地形を表示する</label>
@@ -299,7 +303,7 @@
   function rand(a, b) { return a + Math.random() * (b - a); }
 
   var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var state = { count: 8, speed: 1, len: 450, size: 1.5, auto: !reduceMotion, terrain: true, paused: false, volley: 9, mode: 'free', view: 'oblique', nAtk: 4, nTgt: 4, hp: 4, autoNext: false, followObj: null, followGen: 0, followCam: false, followTeam: 'B', respawn: 0, score: [0, 0], gun: true, ace: true, area: 1, seed: Math.floor(Math.random() * (Terrain.SEED_MAX + 1)) };   // 地形のシードは、開くたびにランダム
+  var state = { count: 8, speed: 1, len: 450, size: 1.5, auto: !reduceMotion, terrain: true, paused: false, volley: 9, mode: 'free', view: 'oblique', nAtk: 4, nTgt: 4, hp: 4, autoNext: false, followObj: null, followGen: 0, followCam: false, followTeam: 'B', respawn: 0, score: [0, 0], gun: true, ace: true, area: 1, seed: Math.floor(Math.random() * (Terrain.SEED_MAX + 1)), followLost: -1, followDelay: 2 };   // 地形のシードは、開くたびにランダム
 
   var renderer;
   try {
@@ -2014,7 +2018,7 @@
     var f = state.followObj;
     return !!f && f.on && !f.dead && f.gen === state.followGen;
   }
-  function setFollow(a) { state.followObj = a; state.followGen = a ? a.gen : 0; }
+  function setFollow(a) { state.followObj = a; state.followGen = a ? a.gen : 0; state.followLost = -1; }
   // 今の機体の次のスロットから、追える機体を探す
   function pickNext() {
     var start = state.followObj ? state.followObj.idx : -1;
@@ -2052,7 +2056,9 @@
       pct = noHp ? 100 : f.hp / f.hpMax * 100;
       low = !noHp && pct <= 25;
     } else if (f) {
-      text = '撃墜されました（「次の機体」で切り替え）';
+      text = state.autoNext && state.followLost >= 0
+        ? '撃墜されました（あと' + Math.ceil(Math.max(0, state.followDelay - state.followLost)) + '秒で次の機体へ）'
+        : '撃墜されました（「次の機体」で切り替え）';
       pct = 0;
     } else {
       text = '追える機体がありません';
@@ -2101,7 +2107,11 @@
     if (!state.ace) for (var i = 0; i < MAXN; i++) setAce(air[i], false);
   });
   var autoNextEl = $('autoNext');
-  autoNextEl.addEventListener('change', function () { state.autoNext = autoNextEl.checked; });
+  autoNextEl.addEventListener('change', function () {
+    state.autoNext = autoNextEl.checked;
+    $('followDelayRow').hidden = !state.autoNext;
+  });
+  bind('followDelay', 'followDelay', function (v) { return v.toFixed(1) + '秒'; });
 
   // 追従するチームの選択（ラベルと選択状態を、モードに合わせて更新する）
   function syncFollowTeamUI() {
@@ -2163,10 +2173,20 @@
     if (state.auto && ptrs.size === 0) cam.yaw += 0.07 * dt;
     if (state.followCam && state.mode !== 'free') {
       // 追う機体を常に画面の中心にとらえる
-      if (!followValid() && (state.autoNext || !state.followObj)) {
-        // 撃墜後の自動切り替え（オプション）。撃墜位置にいちばん近い、追える機体へ
-        var best = pickNearestTo(cam.target);
-        if (best) setFollow(best);
+      if (followValid()) {
+        state.followLost = -1;
+      } else if (!state.followObj) {
+        // まだ誰も追っていない。追える機体が現れたら、すぐ追う
+        var first = pickNearestTo(cam.target);
+        if (first) setFollow(first);
+      } else {
+        // 追っていた機体が撃墜された。余韻のあと（オプション）、撃墜位置にいちばん近い、追える機体へ
+        if (state.followLost < 0) state.followLost = 0;
+        else if (!state.paused) state.followLost += dt;
+        if (state.autoNext && state.followLost >= state.followDelay) {
+          var best = pickNearestTo(cam.target);
+          if (best) setFollow(best);
+        }
       }
       if (followValid()) cam.target.lerp(state.followObj.pos, 1 - Math.exp(-14 * dt));   // 追えなくなったらその場で停止
       updateHud();
