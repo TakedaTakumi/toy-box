@@ -227,6 +227,10 @@
       <label for="size">矢印の大きさ</label><output id="sizeV"></output>
       <input id="size" type="range" min="0.5" max="3" step="0.1" value="1.5">
     </div>
+    <div class="row">
+      <label for="area">戦闘領域の広さ</label><output id="areaV"></output>
+      <input id="area" type="range" min="0.5" max="3" step="0.25" value="1">
+    </div>
     <div class="row" id="volleyRow" hidden>
       <label for="volley">一斉射の数</label><output id="volleyV"></output>
       <input id="volley" type="range" min="3" max="16" step="1" value="9">
@@ -268,7 +272,8 @@
 
   var MAXN = 32;        // 作成する矢印の最大数
   var CAP = 1600;       // 軌跡バッファの点数
-  var R = 125;          // 飛行範囲の半径
+  var R0 = 125;         // 飛行範囲の半径（戦闘領域の広さ ×1.0 のとき）
+  var R = R0;           // 飛行範囲の半径（「戦闘領域の広さ」で変わる）
   var STEP_MAX = 1 / 60;
   var COMMIT = 1.0;     // 軌跡に点を足す最小距離
 
@@ -277,7 +282,7 @@
   function rand(a, b) { return a + Math.random() * (b - a); }
 
   var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var state = { count: 8, speed: 1, len: 450, size: 1.5, auto: !reduceMotion, terrain: true, paused: false, volley: 9, mode: 'free', view: 'oblique', nAtk: 4, nTgt: 4, hp: 4, autoNext: false, followObj: null, followGen: 0, followCam: false, followTeam: 'B', respawn: 0, score: [0, 0], gun: true, ace: true };
+  var state = { count: 8, speed: 1, len: 450, size: 1.5, auto: !reduceMotion, terrain: true, paused: false, volley: 9, mode: 'free', view: 'oblique', nAtk: 4, nTgt: 4, hp: 4, autoNext: false, followObj: null, followGen: 0, followCam: false, followTeam: 'B', respawn: 0, score: [0, 0], gun: true, ace: true, area: 1 };
 
   var renderer;
   try {
@@ -303,8 +308,9 @@
     return Math.max(0, h);
   }
 
-  var terrain = (function () {
-    var half = 160, step = 5, n = (half * 2) / step;
+  // 地形の線。広さと格子の間隔を倍率で変えて、頂点の数は変えない
+  function buildTerrainGeometry(scale) {
+    var half = 160 * scale, step = 5 * scale, n = 64;
     var pos = [], col = [];
     function vtx(x, z) {
       var h = H(x, z);
@@ -326,6 +332,11 @@
     var g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
     g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(col), 3));
+    return g;
+  }
+
+  var terrain = (function () {
+    var g = buildTerrainGeometry(1);
     var m = new THREE.LineBasicMaterial({
       vertexColors: true, transparent: true, opacity: 0.8,
       blending: THREE.AdditiveBlending, depthWrite: false
@@ -1224,7 +1235,7 @@
     m.pos.addScaledVector(m.dir, m.speed * dt);
 
     if (m.pos.y < H(m.pos.x, m.pos.z) + 1) { explode(m.pos, 0.7); killMissile(m); return; }
-    if (m.age > m.life || (m.age > m.burn + 0.5 && m.speed < 20) || Math.abs(m.pos.x) > 320 || Math.abs(m.pos.z) > 320 || m.pos.y > 240) {
+    if (m.age > m.life || (m.age > m.burn + 0.5 && m.speed < 20) || Math.abs(m.pos.x) > 320 * Math.max(1, state.area) || Math.abs(m.pos.z) > 320 * Math.max(1, state.area) || m.pos.y > 240) {
       explode(m.pos, 0.8); killMissile(m); return;
     }
     if (m.pos.distanceToSquared(m.last) > 1.4) {
@@ -1446,9 +1457,9 @@
     a.root.visible = true;
     applyColor(a);
     if (how === 'arrive') {
-      // 範囲のはるか外（約600）から、戦場へ向かって高速で飛んでくる。交戦では自陣側（A: 左、B: 右）から
+      // 範囲のはるか外（半径＋475。広さ ×1.0 で約600）から、戦場へ向かって高速で飛んでくる。交戦では自陣側（A: 左、B: 右）から
       var ang = state.mode === 'duel' ? (a.team === 0 ? Math.PI : 0) + rand(-0.7, 0.7) : rand(0, 6.2832);
-      a.pos.set(Math.cos(ang) * 600, rand(50, 90), Math.sin(ang) * 600);
+      a.pos.set(Math.cos(ang) * (R + 475), rand(50, 90), Math.sin(ang) * (R + 475));
       a.arrP.set(rand(-0.3 * R, 0.3 * R), 45, rand(-0.3 * R, 0.3 * R));
       var yaw = Math.atan2(a.arrP.x - a.pos.x, a.arrP.z - a.pos.z);
       a.q.setFromAxisAngle(UP, yaw);
@@ -1783,6 +1794,8 @@
   /* ---------- カメラ ---------- */
   var cam = { yaw: 0.6, pitch: 0.38, pitchOb: 0.38, dist: 260, target: new THREE.Vector3(0, 26, 0) };
 
+  function maxZoom() { return 520 * Math.max(1, state.area); }
+
   function resize() {
     var w = window.innerWidth, h = window.innerHeight;
     renderer.setSize(w, h);
@@ -1841,7 +1854,7 @@
       }
     } else if (ptrs.size === 2) {
       var nd = pinchDistance();
-      if (pinchD > 0 && nd > 0) cam.dist = clamp(cam.dist * (pinchD / nd), 80, 520);
+      if (pinchD > 0 && nd > 0) cam.dist = clamp(cam.dist * (pinchD / nd), 80, maxZoom());
       pinchD = nd;
     }
   });
@@ -1850,7 +1863,7 @@
   canvas.addEventListener('pointercancel', endPointer);
   canvas.addEventListener('wheel', function (e) {
     e.preventDefault();
-    cam.dist = clamp(cam.dist * Math.exp(e.deltaY * 0.0012), 80, 520);
+    cam.dist = clamp(cam.dist * Math.exp(e.deltaY * 0.0012), 80, maxZoom());
     hideHint();
   }, { passive: false });
 
@@ -1885,6 +1898,21 @@
       paintTrail(air[i]);
     }
   });
+
+  // 戦闘領域の広さ: 飛行の限界と地形はすぐ変わる。機体の配置は「最初から」で作り直される
+  var areaPrev = 1;
+  function setArea() {
+    var ratio = state.area / areaPrev;
+    R = R0 * state.area;
+    terrain.geometry.dispose();
+    terrain.geometry = buildTerrainGeometry(state.area);
+    if (ratio !== 1) {
+      if (state.followCam) camSaved = clamp(camSaved * ratio, 80, maxZoom());
+      else cam.dist = clamp(cam.dist * ratio, 80, maxZoom());
+    }
+    areaPrev = state.area;
+  }
+  bind('area', 'area', function (v) { return '×' + v.toFixed(2); }, setArea);
 
   var autoEl = $('auto');
   autoEl.checked = state.auto;
