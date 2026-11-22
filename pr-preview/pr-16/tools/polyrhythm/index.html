@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ポリリズム・ポリメーター試作</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  color-scheme: light;
+  --bg: #eef2f6;
+  --surface: #ffffff;
+  --ink: #14233a;
+  --muted: #5b6b82;
+  --line: #cfd8e3;
+  --accent: #14233a;
+  --on-accent: #ffffff;
+  --c0: #0b8f7e;
+  --c1: #cc2f6a;
+  --c2: #c77a0a;
+  --font: "Zen Kaku Gothic New", "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0f1826;
+    --surface: #172338;
+    --ink: #e7edf6;
+    --muted: #9aabc2;
+    --line: #2a3a54;
+    --accent: #e7edf6;
+    --on-accent: #0f1826;
+    --c0: #3fd0bb;
+    --c1: #ff6f9f;
+    --c2: #f2b04a;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0f1826;
+  --surface: #172338;
+  --ink: #e7edf6;
+  --muted: #9aabc2;
+  --line: #2a3a54;
+  --accent: #e7edf6;
+  --on-accent: #0f1826;
+  --c0: #3fd0bb;
+  --c1: #ff6f9f;
+  --c2: #f2b04a;
+}
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  line-height: 1.7;
+  -webkit-text-size-adjust: 100%;
+}
+main { max-width: 560px; margin: 0 auto; padding: 20px 16px 40px; }
+h1 { font-size: 1.35rem; line-height: 1.35; margin: 0 0 6px; font-weight: 700; letter-spacing: 0.02em; }
+.lead { margin: 0 0 16px; color: var(--muted); font-size: 0.9rem; min-height: 3.2em; }
+
+.seg {
+  display: inline-flex;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 2px;
+}
+.seg button {
+  font: inherit;
+  font-size: 0.88rem;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 6px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); font-weight: 700; }
+.bar { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+
+button:focus-visible, input:focus-visible { outline: 3px solid var(--c0); outline-offset: 2px; }
+
+.stage {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 10px;
+}
+canvas { display: block; width: 100%; }
+#circle { aspect-ratio: 1 / 1; max-width: 460px; margin: 0 auto; }
+#timeline { height: 210px; }
+[hidden] { display: none !important; }
+
+.status { margin: 12px 2px 14px; font-size: 0.88rem; color: var(--muted); min-height: 2.8em; }
+
+.transport { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+#play {
+  font: inherit; font-weight: 700;
+  background: var(--accent); color: var(--on-accent);
+  border: 0; border-radius: 999px;
+  padding: 12px 26px; cursor: pointer; min-width: 104px;
+}
+.tempo { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.tempo label { font-size: 0.82rem; color: var(--muted); display: flex; justify-content: space-between; }
+.tempo input[type="range"] { width: 100%; accent-color: var(--accent); }
+
+.presets { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.presets button {
+  font: inherit; font-size: 0.85rem;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  border-radius: 8px; padding: 6px 12px; cursor: pointer;
+}
+
+.layers { display: flex; flex-direction: column; gap: 8px; }
+.layer {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 12px; padding: 8px 12px;
+}
+.layer .tog {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 3px solid var(--col); background: transparent; cursor: pointer; flex: none;
+}
+.layer .tog[aria-pressed="true"] { background: var(--col); }
+.layer .name { flex: 1; font-weight: 700; }
+.layer .sub { font-weight: 400; color: var(--muted); font-size: 0.8rem; margin-left: 6px; }
+.layer.off .name { color: var(--muted); }
+.step { display: flex; align-items: center; gap: 4px; }
+.step button {
+  width: 36px; height: 36px; border-radius: 8px;
+  border: 1px solid var(--line); background: transparent; color: var(--ink);
+  font: inherit; font-size: 1.1rem; cursor: pointer;
+}
+.step output { min-width: 28px; text-align: center; font-weight: 700; font-size: 1.05rem; }
+.note { margin-top: 18px; font-size: 0.8rem; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>ポリリズム／ポリメーター</h1>
+  <p class="lead" id="desc"></p>
+
+  <div class="bar">
+    <div class="seg" id="modeSeg">
+      <button type="button" data-mode="poly" aria-pressed="true">ポリリズム</button>
+      <button type="button" data-mode="meter" aria-pressed="false">ポリメーター</button>
+    </div>
+    <div class="seg" id="viewSeg">
+      <button type="button" data-view="circle" aria-pressed="true">円形</button>
+      <button type="button" data-view="timeline" aria-pressed="false">タイムライン</button>
+    </div>
+  </div>
+
+  <div class="stage">
+    <canvas id="circle" role="img" aria-label="リズムを円形に表示したもの"></canvas>
+    <canvas id="timeline" role="img" aria-label="リズムを時間軸に並べて表示したもの" hidden></canvas>
+  </div>
+  <p class="status" id="status"></p>
+
+  <div class="transport">
+    <button type="button" id="play">再生</button>
+    <div class="tempo">
+      <label for="tempo"><span id="tempoLabel"></span><span id="tempoVal"></span></label>
+      <input type="range" id="tempo">
+    </div>
+  </div>
+
+  <div class="presets" id="presets"></div>
+  <div class="layers" id="layers"></div>
+  <p class="note">再生中に数・ON/OFF・プリセットを変えると、全層の頭が揃う次のタイミングで切り替わります（テンポを変えたときだけ、頭から鳴らし直します）。層ごとに音の高さが違い、各層の頭拍は少し大きく鳴ります。</p>
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  var state = {
+    mode: "poly",
+    view: "circle",
+    bpm: 120,
+    cycle: 3,
+    playing: false,
+    layers: [{ on: true, n: 3 }, { on: true, n: 2 }, { on: false, n: 4 }]
+  };
+
+  var PRESETS = {
+    poly: [
+      { label: "3対2", n: [3, 2, 0] },
+      { label: "4対3", n: [4, 3, 0] },
+      { label: "5対4", n: [5, 4, 0] },
+      { label: "2対3対4", n: [2, 3, 4] }
+    ],
+    meter: [
+      { label: "4/4と3/4", n: [4, 3, 0] },
+      { label: "5/4と4/4", n: [5, 4, 0] },
+      { label: "7/4と4/4", n: [7, 4, 0] },
+      { label: "3/4・4/4・5/4", n: [3, 4, 5] }
+    ]
+  };
+  var LIMITS = { poly: [1, 12], meter: [2, 9] };
+  var MAX_WINDOW_BEATS = 24;
+
+  function gcd(a, b) { return b ? gcd(b, a % b) : a; }
+  function lcm(a, b) { return a / gcd(a, b) * b; }
+
+  /* ---------- 幾何（時間の計算） ---------- */
+  function geometry(layersArr) {
+    var act = [];
+    layersArr.forEach(function (l, i) { if (l.on) act.push({ i: i, n: l.n }); });
+    var out = { layers: [], window: 1, loopSec: 1, loopBeats: 1, beat: 0 };
+    if (state.mode === "poly") {
+      var T = state.cycle;
+      act.forEach(function (l) { out.layers.push({ i: l.i, n: l.n, period: T, d: T / l.n }); });
+      out.window = T; out.loopSec = T;
+    } else {
+      var beat = 60 / state.bpm;
+      var L = 1;
+      act.forEach(function (l) {
+        out.layers.push({ i: l.i, n: l.n, period: l.n * beat, d: beat });
+        L = lcm(L, l.n);
+      });
+      out.beat = beat;
+      out.loopBeats = L;
+      out.loopSec = L * beat;
+      out.window = Math.min(L, MAX_WINDOW_BEATS) * beat;
+    }
+    return out;
+  }
+
+  /* ---------- 音 ---------- */
+  var actx = null, timer = null, nextK = [0, 0, 0];
+  var aStart = 0, vStart = 0;          // 音側／描画側の開始時刻
+  var aLayers = null, vLayers = null;  // 音側／描画側で使っている層の設定
+  var pending = null;                  // 保留中の切り替え {at, layers, audioDone, visDone}
+
+  function snap() {
+    return state.layers.map(function (l) { return { on: l.on, n: l.n }; });
+  }
+  function sameLayers(a, b) {
+    return a.every(function (l, i) { return l.on === b[i].on && (!l.on || l.n === b[i].n); });
+  }
+  var WAVES = ["sine", "triangle", "square"];
+  var FREQS = [880, 659.25, 440];
+  var PEAK = [0.32, 0.3, 0.14];
+
+  function click(t, i, accent) {
+    var o = actx.createOscillator(), g = actx.createGain();
+    o.type = WAVES[i];
+    o.frequency.value = FREQS[i];
+    var peak = PEAK[i] * (accent ? 1 : 0.6);
+    var len = accent ? 0.16 : 0.09;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(peak, t + 0.003);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+    o.connect(g); g.connect(actx.destination);
+    o.start(t); o.stop(t + len + 0.02);
+  }
+
+  function schedule() {
+    var round = 0;
+    while (round++ < 3) {
+      var g = geometry(aLayers);
+      var horizon = actx.currentTime + 0.12;
+      var p = pending && !pending.audioDone ? pending : null;
+      var limit = p ? Math.min(horizon, p.at) : horizon;
+      g.layers.forEach(function (l) {
+        var guard = 0;
+        while (aStart + nextK[l.i] * l.d < limit - 1e-6 && guard++ < 2000) {
+          var t = aStart + nextK[l.i] * l.d;
+          if (t >= actx.currentTime - 0.02) click(t, l.i, nextK[l.i] % l.n === 0);
+          nextK[l.i]++;
+        }
+      });
+      if (p && horizon >= p.at) {
+        // 切り替え点まで鳴らし終えたので、新しい設定に移る
+        aStart = p.at; aLayers = p.layers; nextK = [0, 0, 0];
+        p.audioDone = true;
+        continue;
+      }
+      break;
+    }
+  }
+
+  // 頭から鳴らし直す（保留中の変更もここで反映される）
+  function restartClock() {
+    aLayers = vLayers = snap();
+    pending = null;
+    nextK = [0, 0, 0];
+    if (!state.playing) return;
+    aStart = vStart = actx.currentTime + 0.08;
+  }
+
+  // 層の変更を、全層の頭が揃う次のタイミングまで保留する
+  function requestChange() {
+    var s = snap();
+    if (!state.playing) { aLayers = vLayers = s; return; }
+    if (pending && pending.audioDone) { restartClock(); return; }
+    if (sameLayers(s, vLayers)) { pending = null; return; }
+    if (pending) { pending.layers = s; return; }
+    var t = actx.currentTime - aStart;
+    if (t < 0.05) { restartClock(); return; }
+    var L = geometry(aLayers).loopSec;
+    var k = Math.ceil((t + 0.15) / L - 1e-9);
+    pending = { at: aStart + k * L, layers: s, audioDone: false, visDone: false };
+  }
+
+  function play() {
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.resume) actx.resume();
+    } catch (e) { return; }
+    state.playing = true;
+    restartClock();
+    timer = setInterval(schedule, 25);
+    document.getElementById("play").textContent = "停止";
+  }
+  function stop() {
+    state.playing = false;
+    clearInterval(timer); timer = null;
+    pending = null;
+    aLayers = vLayers = snap();
+    document.getElementById("play").textContent = "再生";
+    renderStatus();
+  }
+
+  /* ---------- 描画 ---------- */
+  var circleCv = document.getElementById("circle");
+  var tlCv = document.getElementById("timeline");
+
+  function css() {
+    var cs = getComputedStyle(document.documentElement);
+    function v(n) { return cs.getPropertyValue(n).trim(); }
+    return {
+      ink: v("--ink"), muted: v("--muted"), line: v("--line"), surface: v("--surface"),
+      c: [v("--c0"), v("--c1"), v("--c2")]
+    };
+  }
+  function prep(cv) {
+    var dpr = window.devicePixelRatio || 1;
+    var w = cv.clientWidth, h = cv.clientHeight;
+    if (!w || !h) return null;
+    var pw = Math.round(w * dpr), ph = Math.round(h * dpr);
+    if (cv.width !== pw || cv.height !== ph) { cv.width = pw; cv.height = ph; }
+    var c = cv.getContext("2d");
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.clearRect(0, 0, w, h);
+    return { w: w, h: h, c: c };
+  }
+  function curTime() {
+    if (!state.playing || !actx) return null;
+    return Math.max(0, actx.currentTime - vStart);
+  }
+  var FLASH = 0.2;
+
+  function drawCircle(t) {
+    var p = prep(circleCv); if (!p) return;
+    var c = p.c, col = css(), g = geometry(vLayers);
+    var cx = p.w / 2, cy = p.h / 2, R = Math.min(p.w, p.h) / 2 - 14;
+    function ringR(i) { return R * (0.92 - i * 0.27); }
+
+    c.strokeStyle = col.line; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(cx, cy); c.lineTo(cx, cy - R - 6); c.stroke();
+    g.layers.forEach(function (l) {
+      c.beginPath(); c.arc(cx, cy, ringR(l.i), 0, Math.PI * 2); c.stroke();
+    });
+
+    g.layers.forEach(function (l) {
+      var r = ringR(l.i), color = col.c[l.i];
+      var ph = t == null ? 0 : (t % l.period) / l.period;
+
+      if (l.n >= 3) {
+        c.beginPath();
+        for (var k = 0; k < l.n; k++) {
+          var a = -Math.PI / 2 + k / l.n * Math.PI * 2;
+          var x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+          if (k === 0) c.moveTo(x, y); else c.lineTo(x, y);
+        }
+        c.closePath();
+        c.globalAlpha = 0.4; c.strokeStyle = color; c.lineWidth = 1.5; c.stroke();
+        c.globalAlpha = 1;
+      }
+
+      var ang = -Math.PI / 2 + ph * Math.PI * 2;
+      c.globalAlpha = 0.75; c.strokeStyle = color; c.lineWidth = 2;
+      c.beginPath(); c.moveTo(cx, cy); c.lineTo(cx + Math.cos(ang) * r, cy + Math.sin(ang) * r); c.stroke();
+      c.globalAlpha = 1;
+
+      var kPrev = t == null ? -1 : Math.floor(ph * l.n + 1e-9);
+      for (var j = 0; j < l.n; j++) {
+        var aj = -Math.PI / 2 + j / l.n * Math.PI * 2;
+        var dx = cx + Math.cos(aj) * r, dy = cy + Math.sin(aj) * r;
+        var base = j === 0 ? 9 : 6.5, s = 1, hot = false;
+        if (j === kPrev) {
+          var dt = ph * l.period - j * l.d;
+          if (dt < FLASH) { s = 1 + (1 - dt / FLASH) * 0.8; hot = true; }
+        }
+        c.beginPath(); c.arc(dx, dy, base * s, 0, Math.PI * 2);
+        c.fillStyle = hot ? color : col.surface; c.fill();
+        c.lineWidth = j === 0 ? 3 : 2; c.strokeStyle = color; c.stroke();
+      }
+    });
+  }
+
+  function drawTimeline(t) {
+    var p = prep(tlCv); if (!p) return;
+    var c = p.c, col = css(), g = geometry(vLayers);
+    var padL = 46, padR = 14, top = 14, bottom = 22;
+    var rowH = (p.h - top - bottom) / 3;
+    var W = g.window;
+    function X(time) { return padL + time / W * (p.w - padL - padR); }
+    function Y(i) { return top + rowH * i + rowH / 2; }
+
+    // 頭が揃う位置
+    var counts = {};
+    g.layers.forEach(function (l) {
+      for (var k = 0; k * l.d < W - 1e-9; k++) {
+        var key = Math.round(k * l.d * 1000);
+        counts[key] = (counts[key] || 0) + 1;
+      }
+    });
+    c.setLineDash([4, 4]); c.strokeStyle = col.muted; c.lineWidth = 1; c.globalAlpha = 0.6;
+    Object.keys(counts).forEach(function (key) {
+      if (counts[key] >= 2) {
+        var x = X(key / 1000);
+        c.beginPath(); c.moveTo(x, top - 4); c.lineTo(x, p.h - bottom + 4); c.stroke();
+      }
+    });
+    c.setLineDash([]); c.globalAlpha = 1;
+
+    var tw = t == null ? null : t % W;
+
+    g.layers.forEach(function (l) {
+      var color = col.c[l.i], y = Y(l.i);
+      c.strokeStyle = col.line; c.lineWidth = 1;
+      c.beginPath(); c.moveTo(padL, y); c.lineTo(p.w - padR, y); c.stroke();
+
+      // 小節線
+      c.strokeStyle = color; c.lineWidth = 2; c.globalAlpha = 0.45;
+      for (var b = 0; b * l.period < W - 1e-9; b++) {
+        var bx = X(b * l.period);
+        c.beginPath(); c.moveTo(bx, y - rowH * 0.38); c.lineTo(bx, y + rowH * 0.38); c.stroke();
+      }
+      c.globalAlpha = 1;
+
+      c.fillStyle = color; c.font = '700 13px "Zen Kaku Gothic New", sans-serif';
+      c.textAlign = "left"; c.textBaseline = "middle";
+      c.fillText(state.mode === "poly" ? String(l.n) : l.n + "/4", 8, y);
+
+      for (var k = 0; k * l.d < W - 1e-9; k++) {
+        var ht = k * l.d, x = X(ht);
+        var isHead = (k % l.n) === 0;
+        var s = 1, hot = false;
+        if (tw != null) {
+          var dt = (tw - ht + W) % W;
+          if (dt < FLASH) { s = 1 + (1 - dt / FLASH) * 0.7; hot = true; }
+        }
+        c.beginPath(); c.arc(x, y, (isHead ? 8 : 6) * s, 0, Math.PI * 2);
+        c.fillStyle = hot ? color : col.surface; c.fill();
+        c.lineWidth = isHead ? 3 : 2; c.strokeStyle = color; c.stroke();
+      }
+    });
+
+    // 下の目盛り
+    c.fillStyle = col.muted; c.font = '12px "Zen Kaku Gothic New", sans-serif';
+    c.textBaseline = "alphabetic"; c.textAlign = "left";
+    c.fillText("0", padL, p.h - 6);
+    c.textAlign = "right";
+    var endLabel = state.mode === "poly"
+      ? "1周 " + W.toFixed(1) + "秒"
+      : Math.round(W / g.beat) + "拍分";
+    c.fillText(endLabel, p.w - padR, p.h - 6);
+
+    if (tw != null) {
+      var px = X(tw);
+      c.strokeStyle = col.ink; c.lineWidth = 2;
+      c.beginPath(); c.moveTo(px, top - 6); c.lineTo(px, p.h - bottom + 6); c.stroke();
+    }
+  }
+
+  function frame() {
+    if (pending && !pending.visDone && actx && actx.currentTime >= pending.at) {
+      vStart = pending.at; vLayers = pending.layers; pending.visDone = true;
+      renderStatus();
+    }
+    if (pending && pending.audioDone && pending.visDone) { pending = null; renderStatus(); }
+    var t = curTime();
+    if (state.view === "circle") drawCircle(t); else drawTimeline(t);
+    requestAnimationFrame(frame);
+  }
+
+  /* ---------- UI ---------- */
+  var $ = function (id) { return document.getElementById(id); };
+
+  function renderStatic() {
+    var poly = state.mode === "poly";
+    $("desc").textContent = poly
+      ? "ポリリズム：1周の長さは共通のまま、各層が1周を別々の数で等分します。"
+      : "ポリメーター：拍の速さは共通のまま、各層が別々の拍数で1小節を数えます。";
+    document.querySelectorAll("#modeSeg button").forEach(function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.mode === state.mode));
+    });
+    document.querySelectorAll("#viewSeg button").forEach(function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.view === state.view));
+    });
+    circleCv.hidden = state.view !== "circle";
+    tlCv.hidden = state.view !== "timeline";
+
+    var tempo = $("tempo");
+    if (poly) {
+      tempo.min = 1; tempo.max = 8; tempo.step = 0.1; tempo.value = state.cycle;
+      $("tempoLabel").textContent = "1周の長さ";
+      $("tempoVal").textContent = state.cycle.toFixed(1) + "秒";
+    } else {
+      tempo.min = 40; tempo.max = 200; tempo.step = 1; tempo.value = state.bpm;
+      $("tempoLabel").textContent = "拍の速さ";
+      $("tempoVal").textContent = state.bpm + " BPM";
+    }
+
+    $("presets").innerHTML = PRESETS[state.mode].map(function (p, idx) {
+      return '<button type="button" data-preset="' + idx + '">' + p.label + "</button>";
+    }).join("");
+
+    $("layers").innerHTML = state.layers.map(function (l, i) {
+      var unit = poly ? "分割" : "/4拍子";
+      return '<div class="layer' + (l.on ? "" : " off") + '" style="--col: var(--c' + i + ')">' +
+        '<button type="button" class="tog" data-tog="' + i + '" aria-pressed="' + l.on + '" aria-label="層' + (i + 1) + 'を切り替え"></button>' +
+        '<div class="name">層' + (i + 1) + '<span class="sub">' + l.n + unit + "</span></div>" +
+        '<div class="step">' +
+        '<button type="button" data-dec="' + i + '" aria-label="層' + (i + 1) + 'を減らす">−</button>' +
+        "<output>" + l.n + "</output>" +
+        '<button type="button" data-inc="' + i + '" aria-label="層' + (i + 1) + 'を増やす">＋</button>' +
+        "</div></div>";
+    }).join("");
+
+    renderStatus();
+  }
+
+  function nameOf(layersArr) {
+    var ns = geometry(layersArr).layers.map(function (l) { return l.n; });
+    return state.mode === "poly"
+      ? ns.join("対")
+      : ns.map(function (n) { return n + "/4"; }).join("と");
+  }
+  function renderStatus() {
+    var g = geometry(vLayers);
+    var text;
+    if (state.mode === "poly") {
+      text = nameOf(vLayers) + "のポリリズム。全層の頭は1周（" + g.loopSec.toFixed(1) + "秒）ごとに揃います。";
+    } else {
+      text = nameOf(vLayers) + "のポリメーター。頭が揃うのは" + g.loopBeats + "拍（約" + g.loopSec.toFixed(1) + "秒）ごと。";
+      if (g.loopBeats > MAX_WINDOW_BEATS) text += "タイムラインは先頭" + MAX_WINDOW_BEATS + "拍まで表示します。";
+    }
+    if (pending && !pending.visDone) text += " 次の頭で" + nameOf(pending.layers) + "に切り替わります。";
+    $("status").textContent = text;
+  }
+
+  // 即時に反映する変更（モード切り替え）
+  function changed() {
+    restartClock();
+    renderStatic();
+  }
+  // 全層の頭が揃うタイミングで反映する変更（数・ON/OFF・プリセット）
+  function changedPending() {
+    requestChange();
+    renderStatic();
+  }
+
+  function clamp(n) {
+    var lim = LIMITS[state.mode];
+    return Math.max(lim[0], Math.min(lim[1], n));
+  }
+  function applyPreset(arr) {
+    state.layers = arr.map(function (n, i) {
+      return { on: n > 0, n: n > 0 ? clamp(n) : (state.layers[i] ? state.layers[i].n : 3) };
+    });
+  }
+  function onCount() { return state.layers.filter(function (l) { return l.on; }).length; }
+
+  $("modeSeg").addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.mode === state.mode) return;
+    state.mode = b.dataset.mode;
+    applyPreset(PRESETS[state.mode][0].n);
+    changed();
+  });
+  $("viewSeg").addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    state.view = b.dataset.view;
+    renderStatic();
+  });
+  $("presets").addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    applyPreset(PRESETS[state.mode][Number(b.dataset.preset)].n);
+    changedPending();
+  });
+  $("layers").addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    var d = b.dataset, i;
+    if (d.tog !== undefined) {
+      i = Number(d.tog);
+      if (state.layers[i].on && onCount() === 1) return;
+      state.layers[i].on = !state.layers[i].on;
+    } else if (d.inc !== undefined) {
+      i = Number(d.inc); state.layers[i].n = clamp(state.layers[i].n + 1);
+    } else if (d.dec !== undefined) {
+      i = Number(d.dec); state.layers[i].n = clamp(state.layers[i].n - 1);
+    } else return;
+    changedPending();
+  });
+  $("tempo").addEventListener("input", function (e) {
+    var v = Number(e.target.value);
+    if (state.mode === "poly") { state.cycle = v; $("tempoVal").textContent = v.toFixed(1) + "秒"; }
+    else { state.bpm = v; $("tempoVal").textContent = v + " BPM"; }
+    restartClock();
+    renderStatus();
+  });
+  $("play").addEventListener("click", function () {
+    if (state.playing) stop(); else play();
+  });
+
+  aLayers = vLayers = snap();
+  renderStatic();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
