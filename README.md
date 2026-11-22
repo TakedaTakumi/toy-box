@@ -12,6 +12,7 @@
 - `public/<カテゴリ>/<プロトタイプ名>/index.html` : 各プロトタイプ(画像・JS・READMEなどは同じフォルダに置く)
 - `public/<カテゴリ>/<プロトタイプ名>/README.md` : 各プロトタイプのドキュメント。デプロイ時に `README.html` へ変換して公開する
 - `scripts/build-docs.mjs` : README.md を HTML に変換するスクリプト(`npm ci && npm run build:docs` でローカルでも確認できる。生成物はコミットしない)
+- `tests/` : 切り出した処理のテスト(`npm test`。デプロイ前にCIでも実行する)
 - カテゴリ: `games`(ゲーム) / `tools`(可視化・学習ツール) / `art`(アート・演出)
 
 ## プロトタイプの追加
