@@ -32,6 +32,7 @@
     font-size: 14px;
     overflow: hidden;
   }
+  #attitude { pointer-events: none; display: none; touch-action: none; cursor: default; }
   canvas {
     position: fixed;
     inset: 0;
@@ -184,6 +185,7 @@
 </head>
 <body>
 <canvas id="c" aria-label="矢印が飛び回りながら軌跡を描く3Dアニメーション"></canvas>
+<canvas id="attitude" aria-hidden="true"></canvas>
 
 <header class="title">
   <h1>やじるしコンバット</h1>
@@ -216,6 +218,8 @@
       <label class="check"><input id="viewTop" type="radio" name="view" value="top">真上</label>
       <label class="check" id="viewFpRow" hidden><input id="viewFp" type="radio" name="view" value="fp">主観</label>
     </fieldset>
+    <label class="check" id="starsRow" hidden><input id="stars" type="checkbox" checked>星空（主観）</label>
+    <label class="check" id="attRow" hidden><input id="att" type="checkbox" checked>姿勢表示（主観）</label>
     <div class="row" id="countRow">
       <label for="count">矢印の数</label><output id="countV"></output>
       <input id="count" type="range" min="1" max="32" step="1" value="8">
@@ -304,7 +308,7 @@
   function rand(a, b) { return a + Math.random() * (b - a); }
 
   var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var state = { count: 8, speed: 1, len: 450, size: 1.5, auto: !reduceMotion, terrain: true, paused: false, volley: 9, mode: 'free', view: 'oblique', nAtk: 4, nTgt: 4, hp: 4, autoNext: false, followObj: null, followGen: 0, followCam: false, followTeam: 'B', respawn: 0, score: [0, 0], gun: true, ace: true, area: 1, seed: Math.floor(Math.random() * (Terrain.SEED_MAX + 1)), followLost: -1, followDelay: 2 };   // 地形のシードは、開くたびにランダム
+  var state = { count: 8, speed: 1, len: 450, size: 1.5, auto: !reduceMotion, terrain: true, paused: false, volley: 9, mode: 'free', view: 'oblique', nAtk: 4, nTgt: 4, hp: 4, autoNext: false, followObj: null, followGen: 0, followCam: false, followTeam: 'B', respawn: 0, score: [0, 0], gun: true, ace: true, area: 1, seed: Math.floor(Math.random() * (Terrain.SEED_MAX + 1)), followLost: -1, followDelay: 2, stars: true, att: true };   // 地形のシードは、開くたびにランダム
 
   var renderer;
   try {
@@ -1030,6 +1034,35 @@
   var fHeads = makeParticles(MAXF, 7);
   var cHeads = makeParticles(MAXF, 9);
   var aceHalo = makeParticles(MAXN, 16);   // エース機の周りの金色の光輪
+
+  // 星空: 主観視点で、空を向いたときの目印。世界に固定した星を、遠い球面（上半分）に置く。カメラの位置に合わせて動かす
+  var stars = (function () {
+    var N = 1500, R_SKY = 1800, seed = 20240601;
+    function rnd() {   // 固定の乱数。星の配置は、いつも同じ
+      seed = (seed + 0x6D2B79F5) | 0;
+      var t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    }
+    var pos = new Float32Array(N * 3), col = new Float32Array(N * 3);
+    for (var i = 0; i < N; i++) {
+      var y = rnd() * 1.05 - 0.05, r = Math.sqrt(1 - y * y), th = rnd() * 6.2832, b = 0.35 + 0.65 * Math.pow(rnd(), 2);
+      pos[i * 3] = Math.cos(th) * r * R_SKY; pos[i * 3 + 1] = y * R_SKY; pos[i * 3 + 2] = Math.sin(th) * r * R_SKY;
+      col[i * 3] = 0.8 * b; col[i * 3 + 1] = 0.9 * b; col[i * 3 + 2] = b;
+    }
+    var g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    var m = new THREE.PointsMaterial({
+      size: 3, sizeAttenuation: false, map: dotTex, vertexColors: true, transparent: true,
+      blending: THREE.AdditiveBlending, depthWrite: false, fog: false
+    });
+    var pts = new THREE.Points(g, m);
+    pts.frustumCulled = false;
+    pts.visible = false;
+    scene.add(pts);
+    return pts;
+  })();
 
   function explode(p, s) {
     emit(flashP, p.x, p.y, p.z, 0, 0, 0, 0.35, 1, 0.9, 0.7);
@@ -1830,6 +1863,7 @@
   function maxZoom() { return 520 * Math.max(1, state.area); }
 
   function resize() {
+    resizeAttitude();
     var w = window.innerWidth, h = window.innerHeight;
     renderer.setSize(w, h);
     camera.aspect = w / h;
@@ -1859,6 +1893,61 @@
     _fpE.set(look.pitch, Math.PI + look.yaw, 0);   // 機体の +Z（機首）を、カメラの前（-Z）に合わせる
     _fpQ.setFromEuler(_fpE);
     camera.quaternion.copy(a.q).multiply(_fpQ);
+  }
+
+  // 姿勢表示: 水平線、ピッチの目盛り、ロールの目盛りを、2Dで重ねる。カメラの向きから求めるので、見回しにも合う
+  var attCanvas = $('attitude'), attCtx = attCanvas.getContext('2d');
+  var _ar = new THREE.Vector3(), _au = new THREE.Vector3(), _af = new THREE.Vector3();
+  function resizeAttitude() {
+    if (!attCanvas) return;   // 最初の resize は、定義より前に呼ばれる
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    attCanvas.width = Math.round(window.innerWidth * dpr);
+    attCanvas.height = Math.round(window.innerHeight * dpr);
+  }
+  resizeAttitude();
+  function drawAttitude(show) {
+    attCanvas.style.display = show ? 'block' : 'none';
+    if (!show) return;
+    var w = attCanvas.width, h = attCanvas.height, dpr = w / window.innerWidth, c = attCtx;
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.clearRect(0, 0, w, h);
+    camera.updateMatrixWorld();
+    _ar.setFromMatrixColumn(camera.matrixWorld, 0);
+    _au.setFromMatrixColumn(camera.matrixWorld, 1);
+    _af.setFromMatrixColumn(camera.matrixWorld, 2).negate();
+    var pitch = Math.asin(clamp(_af.y, -1, 1));
+    var theta = Math.atan2(_ar.y, _au.y);                 // 世界の上方向が、画面の上から、どれだけ傾いて見えるか
+    var focal = (h / 2) / Math.tan(camera.fov * Math.PI / 360);
+    c.setTransform(dpr, 0, 0, dpr, w / 2, h / 2);
+    c.lineWidth = 1.4; c.strokeStyle = 'rgba(160, 235, 255, 0.75)'; c.fillStyle = 'rgba(160, 235, 255, 0.85)';
+    c.font = '11px system-ui, sans-serif'; c.textAlign = 'left'; c.textBaseline = 'middle';
+    // 画面に固定: 機首の目印と、ロールの目盛りを指す三角
+    c.beginPath(); c.arc(0, 0, 7, 0, 6.2832); c.moveTo(-18, 0); c.lineTo(-7, 0); c.moveTo(7, 0); c.lineTo(18, 0); c.stroke();
+    c.beginPath(); c.moveTo(0, -84); c.lineTo(-5, -94); c.lineTo(5, -94); c.closePath(); c.fill();
+    // 世界の上方向に合わせて回す
+    c.rotate(theta);
+    for (var a = -90; a <= 90; a += 30) {                 // ロールの目盛り
+      var rad = a * Math.PI / 180, long = a % 90 === 0 ? 10 : 6;
+      c.beginPath(); c.moveTo(Math.sin(rad) * 76, -Math.cos(rad) * 76); c.lineTo(Math.sin(rad) * (76 + long), -Math.cos(rad) * (76 + long)); c.stroke();
+    }
+    var limit = h * 0.75;
+    for (var e = -80; e <= 80; e += 10) {                 // 水平線（0度）と、ピッチの目盛り
+      var d = pitch - e * Math.PI / 180;
+      if (Math.abs(d) >= Math.PI / 2 - 0.05) continue;
+      var y = focal * Math.tan(d);
+      if (Math.abs(y) > limit) continue;
+      var half = e === 0 ? 130 : 36, gap = e === 0 ? 24 : 0;
+      c.globalAlpha = e === 0 ? 1 : 0.8;
+      c.lineWidth = e === 0 ? 2 : 1.4;
+      c.setLineDash(e < 0 ? [5, 4] : []);   // 水平線より下（地面側）の目盛りは、破線にする
+      c.beginPath();
+      if (gap) { c.moveTo(-half, y); c.lineTo(-gap, y); c.moveTo(gap, y); c.lineTo(half, y); }
+      else { c.moveTo(-half, y); c.lineTo(-half / 2, y); c.moveTo(half / 2, y); c.lineTo(half, y); }
+      c.stroke();
+      if (e !== 0) { c.fillText(String(Math.abs(e)), half + 4, y); c.textAlign = 'right'; c.fillText(String(Math.abs(e)), -half - 4, y); c.textAlign = 'left'; }
+    }
+    c.globalAlpha = 1;
+    c.setLineDash([]);
   }
 
   function updateCamera(dt) {
@@ -2026,7 +2115,7 @@
     if (on) { camSaved = cam.dist; cam.dist = 140; }
     else { cam.dist = camSaved; cam.target.set(0, 26, 0); }
     followCamEl.checked = on;
-    if (!on && state.view === 'fp') { state.view = 'oblique'; $('viewObl').checked = true; }   // 追う機体がないので、主観をやめる
+    if (!on && state.view === 'fp') { state.view = 'oblique'; $('viewObl').checked = true; syncFpUI(); }   // 追う機体がないので、主観をやめる
     updateFollowUI();
   }
 
@@ -2132,13 +2221,24 @@
     if (show) { $('scoreAn').textContent = state.score[0]; $('scoreBn').textContent = state.score[1]; }
   }
 
+  // 主観のときだけ、星空と姿勢表示のチェックボックスを出し、ヒントの文を、見回しの説明にする
+  function syncFpUI() {
+    var fp = state.view === 'fp';
+    $('starsRow').hidden = !fp;
+    $('attRow').hidden = !fp;
+    $('hint').textContent = fp ? 'ドラッグで見回す（離すと前向きに戻る）' : 'ドラッグで回転、ホイールやピンチで拡大縮小';
+  }
   var viewObl = $('viewObl'), viewTop = $('viewTop');
-  viewObl.addEventListener('change', function () { if (viewObl.checked) state.view = 'oblique'; });
-  viewTop.addEventListener('change', function () { if (viewTop.checked) state.view = 'top'; });
+  viewObl.addEventListener('change', function () { if (viewObl.checked) { state.view = 'oblique'; syncFpUI(); } });
+  viewTop.addEventListener('change', function () { if (viewTop.checked) { state.view = 'top'; syncFpUI(); } });
+  var starsEl = $('stars'), attEl = $('att');
+  starsEl.addEventListener('change', function () { state.stars = starsEl.checked; });
+  attEl.addEventListener('change', function () { state.att = attEl.checked; });
   var viewFp = $('viewFp');
   viewFp.addEventListener('change', function () {
     if (!viewFp.checked) return;
     state.view = 'fp';
+    syncFpUI();
     if (!state.followCam) setFollowCam(true);    // 主観は、追従カメラで追っている機体から見る
   });
   var modeFree = $('modeFree'), modeChase = $('modeChase'), modeDuel = $('modeDuel');
@@ -2254,6 +2354,10 @@
     }
     updateScore();
     updateCamera(dt);
+    var fpOn = state.view === 'fp';
+    stars.visible = fpOn && state.stars;
+    if (stars.visible) stars.position.copy(camera.position);
+    drawAttitude(fpOn && state.att);
     renderer.render(scene, camera);
   }
   requestAnimationFrame(frame);
