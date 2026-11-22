@@ -214,6 +214,7 @@
       <legend>視点</legend>
       <label class="check"><input id="viewObl" type="radio" name="view" value="oblique" checked>斜め</label>
       <label class="check"><input id="viewTop" type="radio" name="view" value="top">真上</label>
+      <label class="check" id="viewFpRow" hidden><input id="viewFp" type="radio" name="view" value="fp">主観</label>
     </fieldset>
     <div class="row" id="countRow">
       <label for="count">矢印の数</label><output id="countV"></output>
@@ -1774,7 +1775,7 @@
   // エース機の周りに光輪を置く。エースでない機体の分は、黒にして見えなくする
   function syncAceHalo() {
     for (var i = 0; i < MAXN; i++) {
-      var a = air[i], o = i * 3, on = a.on && a.ace && !a.dead && !a.arriving;
+      var a = air[i], o = i * 3, on = a.on && a.ace && !a.dead && !a.arriving && !(state.view === 'fp' && a === state.followObj);
       if (on) { aceHalo.pos[o] = a.pos.x; aceHalo.pos[o + 1] = a.pos.y; aceHalo.pos[o + 2] = a.pos.z; }
       aceHalo.col[o] = on ? 0.75 : 0; aceHalo.col[o + 1] = on ? 0.65 : 0; aceHalo.col[o + 2] = on ? 0.3 : 0;
     }
@@ -1838,7 +1839,31 @@
   resize();
   if (camera.aspect < 1) cam.dist = 400;
 
+  // 主観視点: 追っている機体の機首から前を見る。ドラッグで見回し、離すと前向きに戻る
+  var look = { yaw: 0, pitch: 0 };
+  var FP_FOV = 70, DEFAULT_FOV = 48, LOOK_YAW = 2.09, LOOK_PITCH = 1.05;
+  var _fpE = new THREE.Euler(0, 0, 0, 'YXZ'), _fpQ = new THREE.Quaternion();
+
+  function setFov(fov) {
+    if (Math.abs(camera.fov - fov) < 0.01) return;
+    camera.fov = fov;
+    camera.updateProjectionMatrix();
+  }
+
+  function updateFirstPerson(dt) {
+    setFov(FP_FOV);
+    scene.fog.near = 150; scene.fog.far = 520;
+    if (!followValid()) return;                    // 撃墜されたら、その場で止まる
+    var a = state.followObj;
+    camera.position.copy(a.pos).addScaledVector(a.fwd, 2.0 * state.size).addScaledVector(a.upv, 0.45 * state.size);
+    _fpE.set(look.pitch, Math.PI + look.yaw, 0);   // 機体の +Z（機首）を、カメラの前（-Z）に合わせる
+    _fpQ.setFromEuler(_fpE);
+    camera.quaternion.copy(a.q).multiply(_fpQ);
+  }
+
   function updateCamera(dt) {
+    if (state.view === 'fp') { updateFirstPerson(dt); return; }
+    setFov(DEFAULT_FOV);
     // 視点（斜め／真上）へなめらかに移る
     var goal = state.view === 'top' ? Math.PI / 2 : cam.pitchOb;
     cam.pitch += (goal - cam.pitch) * (1 - Math.exp(-5 * dt));
@@ -1878,7 +1903,12 @@
     if (!prev) return;
     var dx = e.clientX - prev.x, dy = e.clientY - prev.y;
     prev.x = e.clientX; prev.y = e.clientY;
-    if (ptrs.size === 1) {
+    if (state.view === 'fp') {
+      if (ptrs.size === 1) {
+        look.yaw = clamp(look.yaw - dx * 0.005, -LOOK_YAW, LOOK_YAW);
+        look.pitch = clamp(look.pitch - dy * 0.004, -LOOK_PITCH, LOOK_PITCH);
+      }
+    } else if (ptrs.size === 1) {
       cam.yaw -= dx * 0.0055;
       if (state.view !== 'top') {
         cam.pitchOb = clamp(cam.pitchOb + dy * 0.004, -0.05, 1.4);
@@ -1895,6 +1925,7 @@
   canvas.addEventListener('pointercancel', endPointer);
   canvas.addEventListener('wheel', function (e) {
     e.preventDefault();
+    if (state.view === 'fp') return;
     cam.dist = clamp(cam.dist * Math.exp(e.deltaY * 0.0012), 80, maxZoom());
     hideHint();
   }, { passive: false });
@@ -1995,6 +2026,7 @@
     if (on) { camSaved = cam.dist; cam.dist = 140; }
     else { cam.dist = camSaved; cam.target.set(0, 26, 0); }
     followCamEl.checked = on;
+    if (!on && state.view === 'fp') { state.view = 'oblique'; $('viewObl').checked = true; }   // 追う機体がないので、主観をやめる
     updateFollowUI();
   }
 
@@ -2009,6 +2041,7 @@
     $('followCamRow').hidden = !battle;
     $('gunRow').hidden = !battle;
     $('aceRow').hidden = !battle;
+    $('viewFpRow').hidden = !battle;
     $('nAtkL').textContent = mode === 'duel' ? 'チームAの数' : '攻撃側の数';
     $('nTgtL').textContent = mode === 'duel' ? 'チームBの数' : '逃げる側の数';
     if (!battle && state.followCam) setFollowCam(false);
@@ -2102,6 +2135,12 @@
   var viewObl = $('viewObl'), viewTop = $('viewTop');
   viewObl.addEventListener('change', function () { if (viewObl.checked) state.view = 'oblique'; });
   viewTop.addEventListener('change', function () { if (viewTop.checked) state.view = 'top'; });
+  var viewFp = $('viewFp');
+  viewFp.addEventListener('change', function () {
+    if (!viewFp.checked) return;
+    state.view = 'fp';
+    if (!state.followCam) setFollowCam(true);    // 主観は、追従カメラで追っている機体から見る
+  });
   var modeFree = $('modeFree'), modeChase = $('modeChase'), modeDuel = $('modeDuel');
   modeFree.addEventListener('change', function () { if (modeFree.checked) setMode('free'); });
   modeChase.addEventListener('change', function () { if (modeChase.checked) setMode('chase'); });
@@ -2182,11 +2221,17 @@
         stepParticles(flashP, sd, 0, 2.5);
       }
     }
-    for (var j = 0; j < MAXN; j++) { var aj = air[j]; if (aj.on && !aj.dead) sync(aj); }
+    // 主観のあいだは、追っている機体の矢印と地面への線を消す（視界をさえぎるため）
+    var fpSelf = state.view === 'fp' && followValid() ? state.followObj : null;
+    for (var j = 0; j < MAXN; j++) {
+      var aj = air[j];
+      if (aj.on && !aj.dead) { sync(aj); aj.arrow.visible = aj !== fpSelf; aj.drop.visible = aj !== fpSelf; }
+    }
     if (state.mode !== 'free') syncBattle();
     syncAceHalo();
 
-    if (state.auto && ptrs.size === 0) cam.yaw += 0.07 * dt;
+    if (state.auto && ptrs.size === 0 && state.view !== 'fp') cam.yaw += 0.07 * dt;
+    if (ptrs.size === 0) { var back = Math.exp(-3 * dt); look.yaw *= back; look.pitch *= back; }
     if (state.followCam && state.mode !== 'free') {
       // 追う機体を常に画面の中心にとらえる
       if (followValid()) {
