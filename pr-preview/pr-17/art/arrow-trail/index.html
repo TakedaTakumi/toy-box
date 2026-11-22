@@ -980,6 +980,7 @@
   var hvHeads = makeParticles(MAXM, 8);
   var fHeads = makeParticles(MAXF, 7);
   var cHeads = makeParticles(MAXF, 9);
+  var aceHalo = makeParticles(MAXN, 16);   // エース機の周りの金色の光輪
 
   function explode(p, s) {
     emit(flashP, p.x, p.y, p.z, 0, 0, 0, 0.35, 1, 0.9, 0.7);
@@ -1410,7 +1411,6 @@
 
   function colorFor(a) {
     if (state.mode === 'free' || !a.role) return PALETTE[a.idx % PALETTE.length];
-    if (a.ace) return ACE_COLOR;
     if (state.mode === 'duel') {
       return a.team === 0 ? ((a.idx % 2) ? 0x9be7ff : 0x5cd6ff) : ((a.idx % 2) ? 0xffd08a : 0xffb347);   // A: 水色系、B: 琥珀系
     }
@@ -1421,7 +1421,7 @@
     var hex = colorFor(a);
     a.color.setHex(hex);
     a.fillMat.color.copy(a.color);
-    a.edgeCol.copy(a.color).lerp(WHITE, a.ace ? 0.2 : 0.45);
+    if (a.ace) a.edgeCol.copy(ACE_EDGE); else a.edgeCol.copy(a.color).lerp(WHITE, 0.45);   // エースは、チーム色の塗りに金色の輪郭
     a.edgeMat.color.copy(a.edgeCol);
     a.drop.material.color.copy(a.color);
     paintTrail(a);
@@ -1506,6 +1506,7 @@
   /* ---------- エース機 ----------
      開始時は各チームの攻撃する側の1機がエース。撃墜数が ACE_KILLS に達した機体も昇格する。 */
   var ACE_KILLS = 3, ACE_HP = 1.5, ACE_TURN = 1.1, ACE_SALVO = 2, ACE_TRAIL = 1.35, ACE_COLOR = 0xffd54a;
+  var ACE_EDGE = new THREE.Color(ACE_COLOR).lerp(new THREE.Color(1, 1, 1), 0.25);
 
   function maxHpOf(a) { return a.ace ? Math.max(state.hp + 1, Math.ceil(state.hp * ACE_HP)) : state.hp; }
 
@@ -1720,6 +1721,16 @@
     for (i = 0; i < MAXM; i++) stepMissile(missiles[i], h);
     for (i = 0; i < MAXF; i++) { stepFlare(flares[i], h); stepChaff(chaffs[i], h); }
     stepBullets(h);
+  }
+
+  // エース機の周りに光輪を置く。エースでない機体の分は、黒にして見えなくする
+  function syncAceHalo() {
+    for (var i = 0; i < MAXN; i++) {
+      var a = air[i], o = i * 3, on = a.on && a.ace && !a.dead && !a.arriving;
+      if (on) { aceHalo.pos[o] = a.pos.x; aceHalo.pos[o + 1] = a.pos.y; aceHalo.pos[o + 2] = a.pos.z; }
+      aceHalo.col[o] = on ? 0.75 : 0; aceHalo.col[o + 1] = on ? 0.65 : 0; aceHalo.col[o + 2] = on ? 0.3 : 0;
+    }
+    aceHalo.pa.needsUpdate = true; aceHalo.ca.needsUpdate = true;
   }
 
   function syncBattle() {
@@ -2091,6 +2102,7 @@
     }
     for (var j = 0; j < MAXN; j++) { var aj = air[j]; if (aj.on && !aj.dead) sync(aj); }
     if (state.mode !== 'free') syncBattle();
+    syncAceHalo();
 
     if (state.auto && ptrs.size === 0) cam.yaw += 0.07 * dt;
     if (state.followCam && state.mode !== 'free') {
