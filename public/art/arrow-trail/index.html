@@ -908,6 +908,7 @@
     heavy: { burn: [3, 4], nmax: [3, 4], thrust: 50, life: [8, 10], rMin: 60, rMax: 200, head: [1, 0.45, 0.25], decoy: null, dmg: 2, big: 1.8, wob: 0.25 }
   };
   var MISSILE_KINDS = ['ir', 'radar', 'heavy'];
+  var MISSILE_NAME = { ir: '熱誘導', radar: 'レーダー誘導', heavy: '重爆' };
   var _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3();
   var _v4 = new THREE.Vector3(), _v5 = new THREE.Vector3();
   var _e1 = new THREE.Vector3(), _e2 = new THREE.Vector3(), _en = new THREE.Vector3();
@@ -1992,7 +1993,7 @@
       if (state.mode === 'duel') who = 'チーム' + (f.team === 0 ? 'A' : 'B') + ' ' + (f.idx % TGT0 + 1) + '番機';
       else if (f.role === 'atk') { who = '攻撃側 ' + (f.idx + 1) + '番機'; noHp = true; }   // 追撃戦の攻撃側は被弾しない
       else who = '標的 ' + (f.idx - TGT0 + 1);
-      text = '追従中: ' + (f.ace ? 'ACE ' : '') + who + (f.ace || f.kills > 0 ? '　撃墜 ' + f.kills : '') + (noHp ? '' : '　耐久力 ' + Math.ceil(f.hp - 1e-6) + ' / ' + f.hpMax);
+      text = '追従中: ' + (f.ace ? 'ACE ' : '') + who + (f.role === 'tgt' ? '' : '　ミサイル: ' + MISSILE_NAME[f.mKind]) + (f.ace || f.kills > 0 ? '　撃墜 ' + f.kills : '') + (noHp ? '' : '　耐久力 ' + Math.ceil(f.hp - 1e-6) + ' / ' + f.hpMax);
       pct = noHp ? 100 : f.hp / f.hpMax * 100;
       low = !noHp && pct <= 25;
     } else if (f) {
