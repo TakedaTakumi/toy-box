@@ -1,0 +1,2114 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>やじるしコンバット</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #050a12;
+    --ink: #e6f3ff;
+    --muted: #8fa6bf;
+    --cyan: #5cd6ff;
+    --amber: #ffb347;
+    --line: rgba(130, 190, 230, 0.22);
+    --panel: rgba(8, 16, 28, 0.76);
+    color-scheme: dark;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  html, body {
+    height: 100%;
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", "Noto Sans JP", system-ui, sans-serif;
+    font-size: 14px;
+    overflow: hidden;
+  }
+  canvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    touch-action: none;
+    cursor: grab;
+  }
+  canvas:active { cursor: grabbing; }
+
+  .title {
+    position: fixed;
+    left: calc(18px + env(safe-area-inset-left, 0px));
+    top: calc(16px + env(safe-area-inset-top, 0px));
+    pointer-events: none;
+  }
+  .title h1 {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+  }
+  .title p {
+    margin: 4px 0 0;
+    font-size: 0.78rem;
+    color: var(--muted);
+    transition: opacity 1.2s ease;
+  }
+  .title p.gone { opacity: 0; }
+
+  .dock {
+    position: fixed;
+    right: calc(14px + env(safe-area-inset-right, 0px));
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    max-width: calc(100vw - 28px);
+  }
+  .panel {
+    width: 280px;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding: 14px 16px 16px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+  }
+  .panel[hidden] { display: none; }
+  .panel {
+    max-height: calc(100vh - 120px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    overflow-y: auto;
+  }
+  .row[hidden], .actions[hidden], .check[hidden] { display: none; }
+  .score {
+    position: fixed;
+    right: calc(18px + env(safe-area-inset-right, 0px));
+    top: calc(16px + env(safe-area-inset-top, 0px));
+    pointer-events: none;
+    font-size: 0.95rem;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+  .score[hidden] { display: none; }
+  .score .sa { color: var(--cyan); }
+  .score .sb { color: var(--amber); }
+  .score b { font-weight: 500; font-size: 1.25rem; margin: 0 4px; }
+  .hud {
+    position: fixed;
+    left: calc(18px + env(safe-area-inset-left, 0px));
+    top: calc(78px + env(safe-area-inset-top, 0px));
+    pointer-events: none;
+    font-size: 0.8rem;
+    color: var(--ink);
+  }
+  .hud[hidden] { display: none; }
+  .hud .bar { width: 150px; height: 6px; margin-top: 6px; border-radius: 3px; background: rgba(130, 190, 230, 0.22); overflow: hidden; }
+  .hud .bar i { display: block; height: 100%; width: 100%; background: var(--cyan); transition: width 0.25s ease; }
+  .hud .bar i.low { background: var(--amber); }
+  fieldset.mode { border: 0; margin: 0 0 8px; padding: 0; }
+  fieldset.mode legend { padding: 0; margin-bottom: 2px; color: var(--muted); font-size: 0.8rem; }
+  .row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: baseline;
+    margin-bottom: 12px;
+  }
+  .row label { color: var(--ink); }
+  .row output { color: var(--cyan); font-variant-numeric: tabular-nums; }
+  .row input[type="range"] {
+    grid-column: 1 / -1;
+    width: 100%;
+    margin: 8px 0 0;
+    accent-color: var(--cyan);
+  }
+  .check {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 32px;
+    cursor: pointer;
+  }
+  .check input { accent-color: var(--cyan); width: 16px; height: 16px; margin: 0; }
+  .actions { display: flex; gap: 8px; margin-top: 10px; }
+  button {
+    font: inherit;
+    color: var(--ink);
+    background: rgba(8, 16, 28, 0.76);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    min-height: 38px;
+    padding: 0 14px;
+    cursor: pointer;
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+  }
+  .actions button { flex: 1; }
+  button:hover { background: rgba(92, 214, 255, 0.14); }
+  button:focus-visible, input:focus-visible {
+    outline: 2px solid var(--cyan);
+    outline-offset: 2px;
+  }
+  .fallback {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    text-align: center;
+    color: var(--muted);
+  }
+  .fallback[hidden] { display: none; }
+</style>
+</head>
+<body>
+<canvas id="c" aria-label="矢印が飛び回りながら軌跡を描く3Dアニメーション"></canvas>
+
+<header class="title">
+  <h1>やじるしコンバット</h1>
+  <p id="hint">ドラッグで回転、ホイールやピンチで拡大縮小</p>
+</header>
+
+<div class="score" id="score" hidden>
+  <span class="sa">チームA</span><b id="scoreAn">0</b>:<b id="scoreBn">0</b><span class="sb">チームB</span>
+</div>
+
+<div class="hud" id="hud" hidden>
+  <div id="hudLabel"></div>
+  <div class="bar"><i id="hudBar"></i></div>
+</div>
+
+<aside class="dock">
+  <section class="panel" id="panel" aria-label="表示設定">
+    <fieldset class="mode">
+      <legend>モード</legend>
+      <label class="check"><input id="modeFree" type="radio" name="mode" value="free" checked>軌跡だけを眺める</label>
+      <label class="check"><input id="modeChase" type="radio" name="mode" value="chase">追撃戦（ミサイルと回避）</label>
+      <label class="check"><input id="modeDuel" type="radio" name="mode" value="duel">交戦（互いに攻撃）</label>
+    </fieldset>
+    <label class="check" id="followCamRow" hidden><input id="followCam" type="checkbox">追従カメラ</label>
+    <label class="check" id="gunRow" hidden><input id="gun" type="checkbox" checked>機銃</label>
+    <label class="check" id="aceRow" hidden><input id="ace" type="checkbox" checked>エース機</label>
+    <fieldset class="mode">
+      <legend>視点</legend>
+      <label class="check"><input id="viewObl" type="radio" name="view" value="oblique" checked>斜め</label>
+      <label class="check"><input id="viewTop" type="radio" name="view" value="top">真上</label>
+    </fieldset>
+    <div class="row" id="countRow">
+      <label for="count">矢印の数</label><output id="countV"></output>
+      <input id="count" type="range" min="1" max="32" step="1" value="8">
+    </div>
+    <div class="row" id="atkRow" hidden>
+      <label for="nAtk" id="nAtkL">攻撃側の数</label><output id="nAtkV"></output>
+      <input id="nAtk" type="range" min="0" max="16" step="1" value="4">
+    </div>
+    <div class="row" id="tgtRow" hidden>
+      <label for="nTgt" id="nTgtL">逃げる側の数</label><output id="nTgtV"></output>
+      <input id="nTgt" type="range" min="0" max="16" step="1" value="4">
+    </div>
+    <div class="row">
+      <label for="speed">速度</label><output id="speedV"></output>
+      <input id="speed" type="range" min="0.2" max="3" step="0.1" value="1">
+    </div>
+    <div class="row">
+      <label for="len">軌跡の長さ</label><output id="lenV"></output>
+      <input id="len" type="range" min="50" max="1500" step="10" value="450">
+    </div>
+    <div class="row">
+      <label for="size">矢印の大きさ</label><output id="sizeV"></output>
+      <input id="size" type="range" min="0.5" max="3" step="0.1" value="1.5">
+    </div>
+    <div class="row" id="volleyRow" hidden>
+      <label for="volley">一斉射の数</label><output id="volleyV"></output>
+      <input id="volley" type="range" min="3" max="16" step="1" value="9">
+    </div>
+    <div class="row" id="hpRow" hidden>
+      <label for="hp">耐久力（被弾に耐える回数）</label><output id="hpV"></output>
+      <input id="hp" type="range" min="1" max="10" step="1" value="4">
+    </div>
+    <div class="row" id="respawnRow" hidden>
+      <label for="respawn">補充までの時間</label><output id="respawnV"></output>
+      <input id="respawn" type="range" min="0" max="5" step="0.5" value="0">
+    </div>
+    <div id="followRow" hidden>
+      <fieldset class="mode">
+        <legend>追従するチーム</legend>
+        <label class="check"><input id="ftA" type="radio" name="followTeam" value="A"><span id="ftAL">チームA</span></label>
+        <label class="check"><input id="ftB" type="radio" name="followTeam" value="B"><span id="ftBL">チームB</span></label>
+        <label class="check"><input id="ftBoth" type="radio" name="followTeam" value="both" checked>両方</label>
+      </fieldset>
+      <div class="actions"><button id="nextTarget" type="button">次の機体</button></div>
+      <label class="check"><input id="autoNext" type="checkbox">撃墜されたら自動で次の機体へ</label>
+    </div>
+    <label class="check"><input id="auto" type="checkbox">カメラを自動で回す</label>
+    <label class="check"><input id="terrain" type="checkbox" checked>地形を表示する</label>
+    <div class="actions">
+      <button id="reset" type="button">最初から</button>
+      <button id="pause" type="button" aria-pressed="false">一時停止</button>
+    </div>
+  </section>
+  <button id="toggle" type="button" aria-expanded="true" aria-controls="panel">設定</button>
+</aside>
+
+<div class="fallback" id="fallback" hidden>このブラウザでは3D表示（WebGL）を利用できません。</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var MAXN = 32;        // 作成する矢印の最大数
+  var CAP = 1600;       // 軌跡バッファの点数
+  var R = 125;          // 飛行範囲の半径
+  var STEP_MAX = 1 / 60;
+  var COMMIT = 1.0;     // 軌跡に点を足す最小距離
+
+  function $(id) { return document.getElementById(id); }
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+  function rand(a, b) { return a + Math.random() * (b - a); }
+
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var state = { count: 8, speed: 1, len: 450, size: 1.5, auto: !reduceMotion, terrain: true, paused: false, volley: 9, mode: 'free', view: 'oblique', nAtk: 4, nTgt: 4, hp: 4, autoNext: false, followObj: null, followGen: 0, followCam: false, followTeam: 'B', respawn: 0, score: [0, 0], gun: true, ace: true };
+
+  var renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: true });
+  } catch (err) {
+    $('fallback').hidden = false;
+    return;
+  }
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+  var BG = 0x050a12;
+  var scene = new THREE.Scene();
+  scene.background = new THREE.Color(BG);
+  scene.fog = new THREE.Fog(BG, 170, 520);
+  var camera = new THREE.PerspectiveCamera(48, 1, 1, 2000);
+
+  /* ---------- 地形（ワイヤーフレーム） ---------- */
+  function H(x, z) {
+    var h = 12
+      + 9 * Math.sin(0.035 * x + 1.3) * Math.cos(0.03 * z)
+      + 5 * Math.sin(0.08 * x - 0.06 * z)
+      + 2.5 * Math.sin(0.13 * z + 0.05 * x);
+    return Math.max(0, h);
+  }
+
+  var terrain = (function () {
+    var half = 160, step = 5, n = (half * 2) / step;
+    var pos = [], col = [];
+    function vtx(x, z) {
+      var h = H(x, z);
+      pos.push(x, h, z);
+      var d = Math.hypot(x, z) / half;
+      var fall = Math.max(0, 1 - d * d);
+      var k = fall * (0.35 + 0.65 * Math.min(1, h / 26));
+      col.push(0.16 * k, 0.48 * k, 0.74 * k);
+    }
+    var i, j, z, x;
+    for (i = 0; i <= n; i++) {
+      z = -half + i * step;
+      for (j = 0; j < n; j++) { x = -half + j * step; vtx(x, z); vtx(x + step, z); }
+    }
+    for (j = 0; j <= n; j++) {
+      x = -half + j * step;
+      for (i = 0; i < n; i++) { z = -half + i * step; vtx(x, z); vtx(x, z + step); }
+    }
+    var g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
+    g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(col), 3));
+    var m = new THREE.LineBasicMaterial({
+      vertexColors: true, transparent: true, opacity: 0.8,
+      blending: THREE.AdditiveBlending, depthWrite: false
+    });
+    var mesh = new THREE.LineSegments(g, m);
+    mesh.frustumCulled = false;
+    return mesh;
+  })();
+  scene.add(terrain);
+
+  /* ---------- 矢印と軌跡 ---------- */
+  var arrowFill = new THREE.BufferGeometry();
+  arrowFill.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    0, 0, 2.2,  -1.5, 0.3, -1.4,  0, 0, -0.6,
+    0, 0, 2.2,  0, 0, -0.6,  1.5, 0.3, -1.4
+  ]), 3));
+  var arrowEdge = new THREE.BufferGeometry();
+  arrowEdge.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    0, 0, 2.2,  -1.5, 0.3, -1.4,  0, 0, -0.6,  1.5, 0.3, -1.4
+  ]), 3));
+
+  // 軌跡は翼幅の帯（リボン）。各点で左右の翼端の2頂点を持ち、三角形の帯でつなぐ
+  var trailMat = new THREE.MeshBasicMaterial({
+    vertexColors: true, transparent: true, side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending, depthWrite: false
+  });
+  var trailIndex = (function () {
+    var idx = new Uint16Array((CAP - 1) * 6);
+    for (var i = 0; i < CAP - 1; i++) {
+      var v = i * 2;
+      idx.set([v, v + 1, v + 2, v + 1, v + 3, v + 2], i * 6);
+    }
+    return idx;
+  })();
+
+  var PALETTE = [0x5cd6ff, 0xe6f3ff, 0x5cd6ff, 0xffb347];
+  var air = [];
+
+  function makeAircraft(i) {
+    var a = {};
+    a.color = new THREE.Color(PALETTE[i % PALETTE.length]);
+    a.root = new THREE.Group();
+
+    a.arrow = new THREE.Group();
+    a.fillMat = new THREE.MeshBasicMaterial({
+      color: a.color.clone(), transparent: true, opacity: 0.5, side: THREE.DoubleSide, depthWrite: false
+    });
+    a.edgeCol = a.color.clone().lerp(new THREE.Color(0xffffff), 0.45);
+    a.edgeMat = new THREE.LineBasicMaterial({ color: a.edgeCol.clone() });
+    var fill = new THREE.Mesh(arrowFill, a.fillMat);
+    var edge = new THREE.LineLoop(arrowEdge, a.edgeMat);
+    a.arrow.add(fill, edge);
+    a.arrow.scale.setScalar(state.size);
+    a.root.add(a.arrow);
+
+    a.trailPos = new Float32Array(CAP * 6);
+    a.trailCol = new Float32Array(CAP * 6);
+    a.geo = new THREE.BufferGeometry();
+    a.posAttr = new THREE.BufferAttribute(a.trailPos, 3);
+    a.posAttr.setUsage(THREE.DynamicDrawUsage);
+    a.colAttr = new THREE.BufferAttribute(a.trailCol, 3);
+    a.geo.setAttribute('position', a.posAttr);
+    a.geo.setAttribute('color', a.colAttr);
+    a.geo.setIndex(new THREE.BufferAttribute(trailIndex, 1));
+    a.geo.setDrawRange(0, 0);
+    a.trailMat = trailMat.clone();      // 撃墜後に軌跡を薄れさせるため、機体ごとに持つ
+    a.ribbon = new THREE.Mesh(a.geo, a.trailMat);
+    a.ribbon.frustumCulled = false;
+    a.root.add(a.ribbon);
+
+    a.dropPos = new Float32Array(6);
+    a.dropGeo = new THREE.BufferGeometry();
+    a.dropAttr = new THREE.BufferAttribute(a.dropPos, 3);
+    a.dropAttr.setUsage(THREE.DynamicDrawUsage);
+    a.dropGeo.setAttribute('position', a.dropAttr);
+    var drop = new THREE.Line(a.dropGeo, new THREE.LineBasicMaterial({
+      color: a.color, transparent: true, opacity: 0.22, depthWrite: false
+    }));
+    drop.frustumCulled = false;
+    a.drop = drop;
+    a.root.add(drop);
+
+    a.pos = new THREE.Vector3();
+    a.last = new THREE.Vector3();
+    a.fwd = new THREE.Vector3(0, 0, 1);
+    a.q = new THREE.Quaternion();          // 機体の姿勢
+    a.dd = new THREE.Vector3(0, 0, 1);     // パイロットが進みたい方向
+    a.threatDir = new THREE.Vector3(0, 0, 1);
+    a.direct = null; a.man = null;
+    a.rt = new THREE.Vector3(1, 0, 0);   // ロール込みの右方向（翼の向き）
+    a.upv = new THREE.Vector3(0, 1, 0);  // ロール込みの上方向
+    a.role = null;
+    a.tgt = null;
+    a.idx = i;
+    a.team = i < 16 ? 0 : 1;      // スロット 0〜15 = チームA（攻撃側）、16〜31 = チームB（逃げる側）
+    a.arriving = false;           // 遠方から飛来中
+    a.arrP = new THREE.Vector3(); // 飛来中に向かう戦場内の点
+    a.on = false; a.dead = false; a.gen = 0;     // 使用中か・撃墜されたか・世代（補充のたびに増える）
+    a.hp = 1; a.hpMax = 1; a.flash = 0; a.fade = 0; a.respawnT = 0;
+    a.ace = false; a.kills = 0;
+    a.count = 0;
+    a.root.visible = false;
+    scene.add(a.root);
+    paintTrail(a);
+    return a;
+  }
+
+  function paintTrail(a) {
+    var L = state.len, c = a.color, col = a.trailCol, head0 = 1.2 * state.size, gain = a.ace ? ACE_TRAIL : 1;
+    for (var i = 0; i < CAP; i++) {
+      var age = CAP - 1 - i;
+      var t = Math.max(0, 1 - age / L);
+      var b = Math.pow(t, 1.6) * 0.6;
+      // 機体の近くは透明にし、後ろへ向かって徐々に濃くする（矢印との重なりを避ける）
+      var u = clamp((age - head0) / 6, 0, 1);
+      b *= u * u * (3 - 2 * u) * gain;
+      for (var k = 0; k < 2; k++) {
+        var o = (i * 2 + k) * 3;
+        col[o] = c.r * b;
+        col[o + 1] = c.g * b;
+        col[o + 2] = c.b * b;
+      }
+    }
+    a.colAttr.needsUpdate = true;
+  }
+
+  function wave() {
+    return { A: rand(0.12, 0.5), w: rand(0.15, 1.2), p: rand(0, Math.PI * 2) };
+  }
+
+  function reset(a) {
+    var yaw = rand(0, Math.PI * 2);
+    a.q.setFromAxisAngle(UP, yaw);
+    a.pos.set(rand(-0.6 * R, 0.6 * R), rand(25, 55), rand(-0.6 * R, 0.6 * R));
+    a.t = rand(0, 100);
+    a.base = 30 * rand(0.85, 1.15);
+    a.speed = a.base;
+    a.thr = 0.5; a.thrCmd = 0.5;
+    a.p = 0; a.qu = 0; a.r = 0;
+    a.cp = 0; a.cq = 0; a.cr = 0;
+    a.pLim = 1.3; a.nLim = 2.2; a.bankLim = 1.0;
+    a.man = null; a.direct = null;
+    a.manCool = rand(0.5, 2);
+    a.aeroT = rand(8, 20);
+    a.recover = 0; a.yoyo = 0;
+    a.wYaw = yaw; a.wPit = 0;
+    a.yw = [wave(), wave(), wave()];
+    a.pt = [wave(), wave()];
+    a.pt[0].A = rand(0.15, 0.4);
+    a.pt[1].A = rand(0.08, 0.2);
+    basis(a);
+    var p = a.trailPos;
+    for (var i = 0; i < CAP * 2; i++) {
+      p[i * 3] = a.pos.x; p[i * 3 + 1] = a.pos.y; p[i * 3 + 2] = a.pos.z;
+    }
+    initCombat(a);
+    a.count = 0;
+    a.last.copy(a.pos);
+    a.posAttr.needsUpdate = true;
+  }
+
+  // 左右の翼端の位置を帯の1点として書き込む（ロールは a.rt の向きに反映される）
+  function writeRibbonPoint(a, o) {
+    var hw = 1.2 * state.size, p = a.trailPos, rt = a.rt, pos = a.pos;
+    p[o] = pos.x - rt.x * hw; p[o + 1] = pos.y - rt.y * hw; p[o + 2] = pos.z - rt.z * hw;
+    p[o + 3] = pos.x + rt.x * hw; p[o + 4] = pos.y + rt.y * hw; p[o + 5] = pos.z + rt.z * hw;
+  }
+
+  function commit(a) {
+    a.trailPos.copyWithin(0, 6);
+    writeRibbonPoint(a, (CAP - 1) * 6);
+    if (a.count < state.len) a.count++;
+    a.last.copy(a.pos);
+  }
+
+  /* ---------- 飛行モデル（機体座標系） ----------
+     姿勢はクォータニオン。ロール・ピッチ・ヨーの角速度を機体の軸で積分し、
+     進行方向は常に機首の向き。旋回は「機体を傾けて機首を引く」ことで生まれる。
+     速度は推力・抗力・重力・旋回の負荷（誘導抵抗）で決まる。 */
+  var G = 12;            // 重力加速度
+  var TMAX = 18;         // スロットル1.0の推力
+  var CDRAG = 0.01;      // 空気抵抗
+  var CIND = 0.12;       // 旋回の負荷による抵抗
+  var UP = new THREE.Vector3(0, 1, 0);
+  var _qi = new THREE.Quaternion(), _dq = new THREE.Quaternion();
+  var _l = new THREE.Vector3(), _w = new THREE.Vector3(), _ax = new THREE.Vector3();
+  var _dd = new THREE.Vector3(), _wu = new THREE.Vector3(), _hv = new THREE.Vector3();
+  var _m = new THREE.Matrix4();
+  var WHITE = new THREE.Color(1, 1, 1);
+
+  function wrapPi(x) { return Math.atan2(Math.sin(x), Math.cos(x)); }
+  function smooth01(e0, e1, x) { var t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); }
+
+  // 姿勢から、機首・右翼・上方向を求める
+  function basis(a) {
+    a.fwd.set(0, 0, 1).applyQuaternion(a.q);
+    a.rt.set(1, 0, 0).applyQuaternion(a.q);
+    a.upv.set(0, 1, 0).applyQuaternion(a.q);
+  }
+  function orient(a) { basis(a); }
+
+  // 世界の上方向を機体座標で見たベクトル（x: 右, y: 上, z: 前）
+  function worldUpInBody(a) {
+    _qi.copy(a.q).invert();
+    return _wu.set(0, 1, 0).applyQuaternion(_qi);
+  }
+  // 翼を水平に保つためのロール指令（正位置でも背面でも効く）
+  function levelHold(a) {
+    var u = worldUpInBody(a);
+    return 2.5 * u.x * clamp(u.y * 3, -1, 1);
+  }
+
+  // 目標速度を保つオートスロットル（上昇・降下の分を先に見込む）
+  function cruiseThr(a, vt) {
+    return clamp((CDRAG * a.speed * a.speed + G * a.fwd.y + 2.0 * (vt - a.speed)) / TMAX, 0.08, 1);
+  }
+
+  // 進みたい方向 dd へ向かうための、ロール・ピッチ・ヨーの指令を作る
+  function steer(a, dd) {
+    _qi.copy(a.q).invert();
+    _l.copy(dd).applyQuaternion(_qi);                       // 目標方向を機体座標で見る
+    var th = Math.acos(clamp(_l.z, -1, 1));                 // 機首と目標のなす角
+    var psi = Math.atan2(_l.x, _l.y);                       // 機体の上方向から見た目標の向き
+    _wu.set(0, 1, 0).applyQuaternion(_qi);
+    var phiCur = -Math.atan2(_wu.x, _wu.y);                 // 現在のバンク角（右が正）
+    var bw = smooth01(0.015, 0.12, th);                     // 誤差が大きいほど「傾けて引く」
+    var lim = a.bankLim;
+    var phiTgt = bw * clamp(wrapPi(phiCur + psi), -lim, lim);
+    a.cp = 3.2 * wrapPi(phiTgt - phiCur);
+    // 目標が揚力の向きの側にあれば引く。反対側なら（傾きの上限でそこまで傾けられないとき）軽く押し下げる
+    var cs = Math.cos(psi);
+    a.cq = bw * 2.8 * th * (cs >= 0 ? cs : 0.35 * cs) + (1 - bw) * 3.0 * _l.y;
+    a.cr = (1 - 0.6 * bw) * 1.5 * _l.x;
+  }
+
+  function resyncWander(a) {
+    a.wYaw = Math.atan2(a.fwd.x, a.fwd.z);
+    a.wPit = clamp(Math.asin(clamp(a.fwd.y, -1, 1)), -0.4, 0.4);
+  }
+
+  // 通常飛行: ゆるやかに進路を変え、高さを保つ
+  function cruise(a) {
+    var k, w, yr = 0, pt = 0;
+    for (k = 0; k < a.yw.length; k++) { w = a.yw[k]; yr += w.A * Math.sin(w.w * a.t + w.p); }
+    for (k = 0; k < a.pt.length; k++) { w = a.pt[k]; pt += w.A * Math.sin(w.w * a.t + w.p); }
+    a.wYaw += yr * 0.5 * cruise.dt;
+    var x = a.pos.x, z = a.pos.z, y = a.pos.y;
+    var g = Math.max(H(x, z), H(x + a.fwd.x * 28, z + a.fwd.z * 28));
+    var lo = g + 18, hi = Math.min(g + 62, 85);
+    if (y < lo) pt += Math.min(0.6, (lo - y) * 0.05);
+    else if (y > hi) pt -= Math.min(0.5, (y - hi) * 0.04);
+    a.wPit = clamp(pt, -0.35, 0.5);
+    var cp = Math.cos(a.wPit);
+    a.dd.set(Math.sin(a.wYaw) * cp, Math.sin(a.wPit), Math.cos(a.wYaw) * cp);
+  }
+  cruise.dt = 0.016;
+
+  // 攻撃側: 標的を先読みして追う。近づきすぎたら上昇して距離を取る
+  function pursuit(a, dt) {
+    var T = a.tgt;
+    _hv.subVectors(T.pos, a.pos);
+    var dist = _hv.length() || 1;
+    a.dist = dist;
+    a.aim = Math.acos(clamp(a.fwd.dot(_hv) / dist, -1, 1));
+    _dd.copy(_hv).addScaledVector(T.fwd, T.speed * clamp(dist / (a.speed + 40), 0, 1.5) * 0.7).normalize();
+    // 機銃: 近づいたら、弾が当たる先読み点へ機首を向ける
+    a.gunD = dist; a.gunErr = 3;
+    if (state.gun) {
+      gunSolution(a, T);
+      a.gunErr = Math.acos(clamp(a.fwd.dot(_gv), -1, 1));
+      if (dist < GUN_RANGE * 1.3) _dd.copy(_gv);
+    }
+    a.pLim = 3.0; a.nLim = 4.0; a.bankLim = 1.6;
+    if (dist < (state.gun ? 20 : 32)) a.yoyo = 1.2;
+    if (a.yoyo > 0) {
+      a.yoyo -= dt;
+      _dd.copy(a.fwd).multiplyScalar(0.5).addScaledVector(UP, 0.9).normalize();
+      a.thrCmd = a.speed > 26 ? 0.1 : 0.6;
+    } else if (dist > 100) a.thrCmd = 1.3;
+    else a.thrCmd = cruiseThr(a, T.speed * 1.08);
+    a.dd.copy(_dd);
+  }
+
+  function pickWeighted(opts) {
+    var tot = 0, i;
+    for (i = 0; i < opts.length; i++) tot += opts[i][1];
+    var r = Math.random() * tot;
+    for (i = 0; i < opts.length; i++) { r -= opts[i][1]; if (r <= 0) return opts[i][0]; }
+    return opts[0][0];
+  }
+  function newMan(type, thr) {
+    return { type: type, t: 0, side: Math.random() < 0.5 ? -1 : 1, vert: Math.random() < 0.5 ? -1 : 1,
+             phase: 0, roll: 0, ang: 0, minY: 0, thr: thr };
+  }
+
+  // 標的側の回避: ブレイク・切り返し・バレルロール・スプリットSから選ぶ
+  function startEvade(a) {
+    var alt = a.pos.y - H(a.pos.x, a.pos.z);
+    var inside = Math.hypot(a.pos.x, a.pos.z) < R * 0.65 && a.pos.y < 100;
+    var rolled = a.lastType === 'barrel' || a.lastType === 'splits';   // ロール系が続くと目が回るので間を空ける
+    var opts = [['break', 3], ['jink', 2]];
+    if (alt > 22 && inside) opts.push(['barrel', rolled ? 0.3 : 2]);
+    if (alt > 55 && a.speed > 26 && inside) opts.push(['splits', rolled ? 0.3 : 2]);
+    var type = pickWeighted(opts);
+    a.man = newMan(type, Math.random() < 0.5 ? 0.12 : 1.3);
+    a.lastType = type;
+  }
+
+  // 通常飛行の見せ場: 宙返り・インメルマンターン・バレルロール
+  function startAero(a) {
+    a.aeroT = rand(14, 28);
+    if (Math.hypot(a.pos.x, a.pos.z) > R * 0.6) { a.aeroT = 3; return; }   // 外側では始めない
+    var alt = a.pos.y - H(a.pos.x, a.pos.z);
+    var opts = [['barrel', 2]];
+    if (alt > 16 && a.pos.y < 90 && Math.hypot(a.pos.x, a.pos.z) < 0.55 * R) {
+      opts.push(['loop', 4]); opts.push(['immel', 3]);
+    }
+    var type = pickWeighted(opts);
+    a.man = newMan(type, 1.0);
+  }
+
+  function runManeuver(a, dt) {
+    var m = a.man, done = false;
+    m.t += dt;
+    switch (m.type) {
+      case 'break':
+        // ミサイルの視線に対して横向きに急旋回する
+        a.pLim = 3.6; a.nLim = 4.6; a.bankLim = 1.7; a.thrCmd = m.thr;
+        _hv.crossVectors(UP, a.threatDir);
+        if (_hv.lengthSq() < 1e-4) _hv.set(1, 0, 0);
+        _hv.normalize().multiplyScalar(m.side);
+        a.dd.copy(_hv).multiplyScalar(0.9).addScaledVector(UP, 0.35 * m.vert).normalize();
+        if (m.t > 1.7) done = true;
+        break;
+      case 'jink':
+        // 左右に切り返す
+        a.pLim = 2.8; a.nLim = 3.4; a.bankLim = 1.4; a.thrCmd = 1.0;
+        _hv.copy(a.fwd); _hv.y = 0;
+        if (_hv.lengthSq() < 1e-4) _hv.set(0, 0, 1);
+        _hv.normalize();
+        var sd = (Math.floor(m.t / 0.7) % 2 ? -1 : 1) * m.side;
+        _wu.crossVectors(UP, _hv);
+        a.dd.copy(_hv).addScaledVector(_wu, 0.9 * sd);
+        a.dd.y += 0.15 * Math.sin(m.t * 5);
+        a.dd.normalize();
+        if (m.t > 2.2) done = true;
+        break;
+      case 'barrel':
+        // ロールしながら引く（らせん軌道）。1回転したら終わり
+        a.pLim = 3.2; a.nLim = 3.0; a.thrCmd = m.thr;
+        var ev = a.role === 'tgt' || a.role === 'duel';
+        a.direct = { p: m.side * (ev ? 3.0 : 2.2), q: ev ? 0.9 : 0.7, r: 0 };
+        m.roll += Math.abs(a.p) * dt;
+        if (m.roll > 6.28 || m.t > 3.8) done = true;
+        break;
+      case 'splits':
+        // 背面にロールして、そのまま引いて急降下し、進路を反転する
+        a.pLim = 3.4; a.nLim = 5.0; a.thrCmd = 1.3;
+        if (m.phase === 0) {
+          a.direct = { p: m.side * 3.2, q: 0, r: 0 };
+          if (worldUpInBody(a).y < -0.75 || m.t > 1.2) m.phase = 1;
+        }
+        if (m.phase === 1) {
+          a.direct = { p: levelHold(a), q: 3.0, r: 0 };
+          m.minY = Math.min(m.minY, a.fwd.y);
+          if ((m.minY < -0.8 && a.fwd.y > -0.15) || m.t > 5) done = true;
+        }
+        break;
+      case 'loop':
+        a.pLim = 3.0; a.nLim = 6.0; a.thrCmd = 1.3;
+        if (m.phase === 0) {      // 速度をつけてから引く
+          a.dd.copy(a.fwd); a.dd.y = 0;
+          if (a.dd.lengthSq() < 1e-4) a.dd.set(0, 0, 1);
+          a.dd.normalize();
+          if (a.speed >= 36 || m.t > 3) m.phase = 1;
+        }
+        if (m.phase === 1) {
+          a.direct = { p: levelHold(a), q: 1.3, r: 0 };
+          m.ang += a.qu * dt;
+          if (m.ang > 6.0 || m.t > 9) done = true;
+        }
+        break;
+      case 'immel':
+        a.pLim = 3.0; a.nLim = 6.0; a.thrCmd = 1.3;
+        if (m.phase === 0) {
+          a.dd.copy(a.fwd); a.dd.y = 0;
+          if (a.dd.lengthSq() < 1e-4) a.dd.set(0, 0, 1);
+          a.dd.normalize();
+          if (a.speed >= 36 || m.t > 3) m.phase = 1;
+        }
+        if (m.phase === 1) {
+          a.direct = { p: levelHold(a), q: 1.4, r: 0 };
+          m.ang += a.qu * dt;
+          if (m.ang > 2.9) m.phase = 2;
+        }
+        if (m.phase === 2) {      // 背面のままロールして正位置に戻る
+          a.direct = { p: m.side * 3.0, q: 0.1, r: 0 };
+          if (worldUpInBody(a).y > 0.9 || m.t > 9) done = true;
+        }
+        break;
+      default:
+        done = true;
+    }
+    if (done) {
+      a.man = null;
+      a.direct = null;
+      a.manCool = (a.role === 'tgt' || a.role === 'duel') ? rand(0.15, 0.5) : 0;
+      resyncWander(a);
+    }
+  }
+
+  // 地面・範囲外を避ける（最優先）
+  function safety(a, dt) {
+    var x = a.pos.x, z = a.pos.z, y = a.pos.y;
+    var L = clamp(a.speed, 24, 60);
+    var g = Math.max(H(x, z), H(x + a.fwd.x * L, z + a.fwd.z * L), H(x + a.fwd.x * L * 0.5, z + a.fwd.z * L * 0.5));
+    var sink = Math.max(0, -a.fwd.y) * a.speed;
+    if (y - g < 14 + sink * 1.4) {
+      if (a.recover <= 0) { a.man = null; a.direct = null; }
+      a.recover = 0.8;
+    }
+    if (a.recover > 0) {
+      a.recover -= dt;
+      a.direct = null;
+      _hv.copy(a.fwd); _hv.y = 0;
+      if (_hv.lengthSq() < 1e-4) _hv.set(Math.sin(a.wYaw), 0, Math.cos(a.wYaw));
+      _hv.normalize();
+      a.dd.copy(_hv).multiplyScalar(0.45).addScaledVector(UP, 0.9).normalize();
+      a.pLim = 3.4; a.nLim = 5.5; a.bankLim = 2.2; a.thrCmd = 1.2;
+      return;
+    }
+    var d = Math.hypot(x, z);
+    if (a.speed < 17 && a.man) { a.man = null; a.direct = null; a.manCool = Math.max(a.manCool, 0.8); }
+    if (d > R * 1.2 || y > 135) {   // 遠く離れすぎ・高すぎたら機動を打ち切って戻る
+      a.man = null; a.direct = null;
+      a.manCool = Math.max(a.manCool, 1.2);
+      a.aeroT = Math.max(a.aeroT, 4);
+    }
+    if (!a.direct && d > R * 0.6) {
+      // 進みたい向きを、中心へ戻る向きへ寄せる（向きの角度で混ぜる。ベクトルで混ぜると打ち消し合うため）
+      var k = clamp((d - R * 0.6) / (R * 0.35), 0, 1);
+      if (d > R * 1.2) k = 1;
+      var yD = Math.atan2(a.dd.x, a.dd.z), yC = Math.atan2(-x, -z);
+      var ny = yD + wrapPi(yC - yD) * k;
+      var pitD = Math.asin(clamp(a.dd.y, -1, 1)) * (1 - 0.5 * k) + 0.5 * k * clamp((40 - y) * 0.01, -0.3, 0.3);
+      var cpd = Math.cos(pitD);
+      a.dd.set(Math.sin(ny) * cpd, Math.sin(pitD), Math.cos(ny) * cpd);
+      a.bankLim = Math.max(a.bankLim, 1.5 * k);
+      a.pLim = Math.max(a.pLim, 2.4 * k);
+      a.nLim = Math.max(a.nLim, 4.5 * k);
+      a.wYaw += wrapPi(Math.atan2(a.fwd.x, a.fwd.z) - a.wYaw) * Math.min(1, 2 * dt) * k;
+    }
+    if (!a.direct) {
+      // 高すぎたら降下する
+      var kc = clamp((y - 100) / 35, 0, 1);
+      if (kc > 0) {
+        var pc = Math.asin(clamp(a.dd.y, -1, 1)) * (1 - kc) - 0.4 * kc;
+        var hl = Math.hypot(a.dd.x, a.dd.z) || 1;
+        var cpc = Math.cos(pc);
+        a.dd.set(a.dd.x / hl * cpc, Math.sin(pc), a.dd.z / hl * cpc);
+      }
+      // 低速すぎたら加速して機首を下げる（失速の防止）
+      if (a.speed < 18) {
+        a.thrCmd = Math.max(a.thrCmd, 1.3);
+        a.dd.y = Math.min(a.dd.y, -0.25);
+        a.dd.normalize();
+      }
+    }
+  }
+
+  // その時点の状況から、進みたい方向・操縦の限界・スロットルを決める
+  function decide(a, dt) {
+    a.direct = null;
+    a.pLim = 1.3; a.nLim = 2.2; a.bankLim = 1.0;
+    a.thrCmd = cruiseThr(a, a.base);
+    a.manCool -= dt;
+    cruise.dt = dt;
+    if (a.arriving) {
+      // 補充機: 遠方から戦場へ向けて、まっすぐ高速で飛んでくる
+      if (Math.hypot(a.pos.x, a.pos.z) < R * 0.95) { a.arriving = false; resyncWander(a); }
+      else {
+        a.man = null; a.direct = null; a.recover = 0;
+        a.dd.subVectors(a.arrP, a.pos).normalize();
+        a.pLim = 1.6; a.nLim = 2.5; a.bankLim = 1.2;
+        a.thrCmd = 1.3;
+        a.speed = Math.max(a.speed, 70);
+        return;
+      }
+    }
+    var role = a.role;
+    if (!a.man) {
+      if (role === 'tgt' || role === 'duel') {
+        if ((a.threat < 95 || a.gunThreat < 110) && a.manCool <= 0 && a.recover <= 0) startEvade(a);
+      } else if (!role) {
+        a.aeroT -= dt;
+        if (a.aeroT <= 0 && a.recover <= 0) startAero(a);
+      }
+    }
+    if (a.man) runManeuver(a, dt);
+    if (!a.man) {
+      if ((role === 'atk' || role === 'duel') && a.tgt) pursuit(a, dt);
+      else cruise(a);
+    }
+    safety(a, dt);
+  }
+
+  // 指令 → ロール・ピッチ・ヨーの角速度（上限と応答の遅れつき）
+  function controls(a, dt) {
+    var auth = clamp((a.speed - 8) / 12, 0.25, 1);               // 低速では舵が効きにくい
+    var turn = a.ace ? ACE_TURN : 1;
+    var qMax = Math.min(2.4, a.nLim * G / Math.max(a.speed, 12)) * auth * turn;   // Gの上限
+    var pMax = a.pLim * auth * turn;
+    var cp, cq, cr;
+    if (a.direct) { cp = a.direct.p; cq = a.direct.q; cr = a.direct.r; }
+    else { steer(a, a.dd); cp = a.cp; cq = a.cq; cr = a.cr; }
+    a.p += (clamp(cp, -pMax, pMax) - a.p) * Math.min(1, 7 * dt);
+    a.qu += (clamp(cq, -qMax * 0.4, qMax) - a.qu) * Math.min(1, 5 * dt);
+    a.r += (clamp(cr, -0.5, 0.5) - a.r) * Math.min(1, 4 * dt);
+  }
+
+  function integrate(a, dt) {
+    // 機体の軸まわりに回転: ピッチ上げは -x、右ロールは -z、右ヨーは +y
+    _w.set(-a.qu, a.r, -a.p);
+    var ang = _w.length() * dt;
+    if (ang > 1e-9) {
+      _ax.copy(_w).normalize();
+      _dq.setFromAxisAngle(_ax, ang);
+      a.q.multiply(_dq).normalize();
+    }
+    basis(a);
+    // 速度: 推力 - 抗力 - 旋回の負荷 - 重力（上昇で減速、降下で加速）
+    a.thr += (a.thrCmd - a.thr) * Math.min(1, 2.5 * dt);
+    var n = Math.max(1, Math.abs(a.qu) * a.speed / G);
+    var acc = a.thr * TMAX - CDRAG * a.speed * a.speed - CIND * (n * n - 1) - G * a.fwd.y;
+    a.speed = clamp(a.speed + acc * dt, 9, 75);
+    a.pos.addScaledVector(a.fwd, a.speed * dt);
+    a.pos.y = Math.max(a.pos.y, H(a.pos.x, a.pos.z) + 3);
+    if (a.pos.distanceToSquared(a.last) > COMMIT * COMMIT) { orient(a); commit(a); }
+  }
+
+  function stepAircraft(a, dt) {
+    a.t += dt;
+    if (a.flash > 0) a.flash = Math.max(0, a.flash - dt * 3);
+    decide(a, dt);
+    controls(a, dt);
+    integrate(a, dt);
+  }
+
+  function sync(a) {
+    orient(a);
+    writeRibbonPoint(a, (CAP - 1) * 6);
+    a.posAttr.needsUpdate = true;
+    var n = Math.min(a.count, state.len) + 1;
+    a.geo.setDrawRange((CAP - n) * 6, (n - 1) * 6);
+
+    _m.makeBasis(a.rt, a.upv, a.fwd);
+    a.arrow.quaternion.setFromRotationMatrix(_m);
+    a.arrow.position.copy(a.pos);
+    // 被弾すると矢印が白く光る
+    var fl = a.flash;
+    a.fillMat.color.copy(a.color).lerp(WHITE, fl);
+    a.fillMat.opacity = 0.5 + 0.4 * fl;
+    a.edgeMat.color.copy(a.edgeCol).lerp(WHITE, fl);
+
+    var dp = a.dropPos;
+    dp[0] = a.pos.x; dp[1] = a.pos.y; dp[2] = a.pos.z;
+    dp[3] = a.pos.x; dp[4] = H(a.pos.x, a.pos.z); dp[5] = a.pos.z;
+    a.dropAttr.needsUpdate = true;
+  }
+
+  for (var i = 0; i < MAXN; i++) air.push(makeAircraft(i));
+
+  /* ---------- 追撃戦（ミサイル・フレア・爆発） ---------- */
+  var MAXM = 320, MTRAIL = 160, MAXF = 160;
+
+  // ミサイルの種類ごとの性能。decoy は惑わされる囮、dmg は耐久力の減り、big は命中時の爆発の大きさ、wob は軌道の膨らみの倍率
+  var MISSILE = {
+    ir:    { burn: [1.6, 2.2], nmax: [12, 15], thrust: 42, life: [5, 6.5], rMin: 35, rMax: 150, head: [1, 0.78, 0.55], decoy: 'flare', dmg: 1, big: 1, wob: 1 },
+    radar: { burn: [2.4, 3.2], nmax: [8, 10], thrust: 48, life: [7, 9], rMin: 50, rMax: 230, head: [0.6, 0.9, 1], decoy: 'chaff', dmg: 1, big: 1, wob: 1 },
+    heavy: { burn: [3, 4], nmax: [3, 4], thrust: 50, life: [8, 10], rMin: 60, rMax: 200, head: [1, 0.45, 0.25], decoy: null, dmg: 2, big: 1.8, wob: 0.25 }
+  };
+  var MISSILE_KINDS = ['ir', 'radar', 'heavy'];
+  var _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3();
+  var _v4 = new THREE.Vector3(), _v5 = new THREE.Vector3();
+  var _e1 = new THREE.Vector3(), _e2 = new THREE.Vector3(), _en = new THREE.Vector3();
+  var _q = new THREE.Quaternion();
+
+  var dotTex = (function () {
+    var c = document.createElement('canvas');
+    c.width = 64; c.height = 64;
+    var g = c.getContext('2d');
+    var gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(255,255,255,1)');
+    gr.addColorStop(0.35, 'rgba(255,255,255,0.55)');
+    gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr;
+    g.fillRect(0, 0, 64, 64);
+    return new THREE.CanvasTexture(c);
+  })();
+
+  // 光る点の集まり（火花・閃光・ミサイルの先端・フレア）
+  function makeParticles(max, size) {
+    var P = {
+      max: max, next: 0,
+      pos: new Float32Array(max * 3), col: new Float32Array(max * 3), base: new Float32Array(max * 3),
+      vel: new Float32Array(max * 3), life: new Float32Array(max), mlife: new Float32Array(max)
+    };
+    var g = new THREE.BufferGeometry();
+    P.pa = new THREE.BufferAttribute(P.pos, 3); P.pa.setUsage(THREE.DynamicDrawUsage);
+    P.ca = new THREE.BufferAttribute(P.col, 3); P.ca.setUsage(THREE.DynamicDrawUsage);
+    g.setAttribute('position', P.pa);
+    g.setAttribute('color', P.ca);
+    P.pts = new THREE.Points(g, new THREE.PointsMaterial({
+      size: size, map: dotTex, vertexColors: true, transparent: true,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+      fog: false   // 未使用の粒(黒)が原点に重なり、霧の色が加算されて光る玉になるのを防ぐ
+    }));
+    P.pts.frustumCulled = false;
+    scene.add(P.pts);
+    return P;
+  }
+  function emit(P, x, y, z, vx, vy, vz, life, r, g, b) {
+    var i = P.next, o = i * 3;
+    P.next = (i + 1) % P.max;
+    P.pos[o] = x; P.pos[o + 1] = y; P.pos[o + 2] = z;
+    P.vel[o] = vx; P.vel[o + 1] = vy; P.vel[o + 2] = vz;
+    P.life[i] = life; P.mlife[i] = life;
+    P.base[o] = r; P.base[o + 1] = g; P.base[o + 2] = b;
+    P.col[o] = r; P.col[o + 1] = g; P.col[o + 2] = b;
+  }
+  function stepParticles(P, dt, gravity, drag) {
+    var k = Math.exp(-drag * dt);
+    for (var i = 0; i < P.max; i++) {
+      var l = P.life[i];
+      if (l <= 0) continue;
+      l -= dt;
+      var o = i * 3;
+      if (l <= 0) { P.life[i] = 0; P.col[o] = 0; P.col[o + 1] = 0; P.col[o + 2] = 0; continue; }
+      P.life[i] = l;
+      P.vel[o] *= k; P.vel[o + 1] = P.vel[o + 1] * k - gravity * dt; P.vel[o + 2] *= k;
+      P.pos[o] += P.vel[o] * dt; P.pos[o + 1] += P.vel[o + 1] * dt; P.pos[o + 2] += P.vel[o + 2] * dt;
+      var f = Math.pow(l / P.mlife[i], 1.5);
+      P.col[o] = P.base[o] * f; P.col[o + 1] = P.base[o + 1] * f; P.col[o + 2] = P.base[o + 2] * f;
+    }
+    P.pa.needsUpdate = true;
+    P.ca.needsUpdate = true;
+  }
+
+  var sparkP = makeParticles(6000, 3.2);
+  var flashP = makeParticles(80, 16);
+  var mHeads = makeParticles(MAXM, 3.4);
+  var hvHeads = makeParticles(MAXM, 8);
+  var fHeads = makeParticles(MAXF, 7);
+  var cHeads = makeParticles(MAXF, 9);
+
+  function explode(p, s) {
+    emit(flashP, p.x, p.y, p.z, 0, 0, 0, 0.35, 1, 0.9, 0.7);
+    var n = Math.round(26 * s), i;
+    for (i = 0; i < n; i++) {
+      var u = rand(-1, 1), th = rand(0, 6.2832), r = Math.sqrt(1 - u * u), sp = rand(6, 24) * s;
+      emit(sparkP, p.x, p.y, p.z, r * Math.cos(th) * sp, u * sp, r * Math.sin(th) * sp,
+        rand(0.5, 1.1), 1, rand(0.6, 0.85), rand(0.25, 0.5));
+    }
+    // 衝撃リング
+    var u2 = rand(-1, 1), th2 = rand(0, 6.2832), r2 = Math.sqrt(1 - u2 * u2);
+    _en.set(r2 * Math.cos(th2), u2, r2 * Math.sin(th2));
+    _e1.crossVectors(_en, UP);
+    if (_e1.lengthSq() < 1e-4) _e1.set(1, 0, 0);
+    _e1.normalize();
+    _e2.crossVectors(_en, _e1);
+    for (i = 0; i < 18; i++) {
+      var ang = i / 18 * 6.2832, ca = Math.cos(ang) * 20 * s, sa = Math.sin(ang) * 20 * s;
+      emit(sparkP, p.x, p.y, p.z,
+        _e1.x * ca + _e2.x * sa, _e1.y * ca + _e2.y * sa, _e1.z * ca + _e2.z * sa,
+        0.55, 0.5, 0.85, 1.0);
+    }
+  }
+
+  /* ミサイル（白い煙の軌跡つき） */
+  var missiles = [];
+  function makeMissile() {
+    var m = {
+      alive: false, fade: 0, age: 0, cnt: 0, tgt: null, flare: null, fool: false, kind: 'ir',
+      pos: new THREE.Vector3(), dir: new THREE.Vector3(1, 0, 0), last: new THREE.Vector3()
+    };
+    m.tp = new Float32Array(MTRAIL * 3);
+    var tc = new Float32Array(MTRAIL * 3);
+    for (var i = 0; i < MTRAIL; i++) {
+      var age = MTRAIL - 1 - i;
+      var b = Math.pow(Math.max(0, 1 - age / MTRAIL), 1.3);
+      tc[i * 3] = 0.85 * b; tc[i * 3 + 1] = 0.92 * b; tc[i * 3 + 2] = b;
+    }
+    m.geo = new THREE.BufferGeometry();
+    m.pa = new THREE.BufferAttribute(m.tp, 3);
+    m.pa.setUsage(THREE.DynamicDrawUsage);
+    m.geo.setAttribute('position', m.pa);
+    m.geo.setAttribute('color', new THREE.BufferAttribute(tc, 3));
+    m.geo.setDrawRange(0, 0);
+    m.mat = new THREE.LineBasicMaterial({
+      vertexColors: true, transparent: true, opacity: 0,
+      blending: THREE.AdditiveBlending, depthWrite: false
+    });
+    m.line = new THREE.Line(m.geo, m.mat);
+    m.line.frustumCulled = false;
+    m.line.visible = false;
+    scene.add(m.line);
+    return m;
+  }
+  for (var mi = 0; mi < MAXM; mi++) missiles.push(makeMissile());
+
+  function updTrail(m) {
+    var o = (MTRAIL - 1) * 3;
+    m.tp[o] = m.pos.x; m.tp[o + 1] = m.pos.y; m.tp[o + 2] = m.pos.z;
+    var n = Math.min(m.cnt, MTRAIL - 1) + 1;
+    m.geo.setDrawRange(MTRAIL - n, n);
+    m.pa.needsUpdate = true;
+  }
+  function killMissile(m) {
+    m.alive = false;
+    m.fade = 1;
+    m.mat.opacity = 1;
+    updTrail(m);
+  }
+
+  /* フレア */
+  var flares = [];
+  for (var fi = 0; fi < MAXF; fi++) {
+    flares.push({ life: 0, mlife: 1, acc: 0, owner: null, pos: new THREE.Vector3(), vel: new THREE.Vector3() });
+  }
+  function spawnFlare(a) {
+    var f = null;
+    for (var q = 0; q < MAXF; q++) { if (flares[q].life <= 0) { f = flares[q]; break; } }
+    if (!f) return;
+    f.owner = a; f.life = 2.6; f.mlife = 2.6; f.acc = 0;
+    f.pos.copy(a.pos).addScaledVector(a.fwd, -2);
+    f.vel.copy(a.fwd).multiplyScalar(a.speed * 0.35)
+      .addScaledVector(a.rt, rand(-1, 1) * 14)
+      .addScaledVector(a.upv, rand(-1, 0.2) * 14);
+  }
+  function stepFlare(f, h) {
+    if (f.life <= 0) return;
+    f.life -= h;
+    f.vel.multiplyScalar(Math.exp(-0.9 * h));
+    f.vel.y -= 7 * h;
+    f.pos.addScaledVector(f.vel, h);
+    f.acc += h;
+    if (f.acc > 0.025) {
+      f.acc = 0;
+      emit(sparkP, f.pos.x, f.pos.y, f.pos.z, rand(-1.5, 1.5), rand(-1.5, 1.5), rand(-1.5, 1.5), 0.8, 1, 0.78, 0.45);
+    }
+    if (f.pos.y < H(f.pos.x, f.pos.z)) f.life = 0;
+  }
+
+  /* チャフ: フレアより長く漂い、レーダー誘導のミサイルだけを惑わす */
+  var chaffs = [];
+  for (var ci = 0; ci < MAXF; ci++) {
+    chaffs.push({ life: 0, mlife: 1, acc: 0, owner: null, pos: new THREE.Vector3(), vel: new THREE.Vector3() });
+  }
+  function spawnChaff(a) {
+    var c = null;
+    for (var q = 0; q < MAXF; q++) { if (chaffs[q].life <= 0) { c = chaffs[q]; break; } }
+    if (!c) return;
+    c.owner = a; c.life = 3.0; c.mlife = 3.0; c.acc = 0;
+    c.pos.copy(a.pos).addScaledVector(a.fwd, -2);
+    c.vel.copy(a.fwd).multiplyScalar(a.speed * 0.25)
+      .addScaledVector(a.rt, rand(-1, 1) * 10)
+      .addScaledVector(a.upv, rand(-1, 1) * 10);
+  }
+  function stepChaff(c, h) {
+    if (c.life <= 0) return;
+    c.life -= h;
+    c.vel.multiplyScalar(Math.exp(-1.6 * h));
+    c.vel.y -= 2 * h;
+    c.pos.addScaledVector(c.vel, h);
+    c.acc += h;
+    if (c.acc > 0.04) {
+      c.acc = 0;
+      emit(sparkP, c.pos.x, c.pos.y, c.pos.z, rand(-3, 3), rand(-3, 3), rand(-3, 3), 1.1, 0.6, 1, 0.8);
+    }
+    if (c.pos.y < H(c.pos.x, c.pos.z)) c.life = 0;
+  }
+
+  /* 一斉射: 機首から大きく扇状にばらけて発射する（板野サーカス） */
+  function spawnMissile(atk) {
+    var m = null;
+    for (var q = 0; q < MAXM; q++) {
+      if (!missiles[q].alive && missiles[q].fade <= 0) { m = missiles[q]; break; }
+    }
+    if (!m) return;
+    m.alive = true; m.fade = 1; m.age = 0; m.cnt = 0;
+    m.mat.opacity = 1;
+    m.line.visible = true;
+    var K = MISSILE[atk.mKind];
+    m.kind = atk.mKind; m.head = K.head; m.shooter = atk; m.sgen = atk.gen;
+    m.tgt = atk.tgt; m.team = atk.team; m.flare = null; m.fool = !!K.decoy && Math.random() < 0.8;
+    m.pos.copy(atk.pos).addScaledVector(atk.rt, rand(-1.5, 1.5)).addScaledVector(atk.upv, -0.6);
+    var ang = rand(0, 6.2832), spread = rand(0.5, 1.25);
+    _v1.copy(atk.rt).multiplyScalar(Math.cos(ang) * Math.sin(spread))
+      .addScaledVector(atk.upv, Math.sin(ang) * Math.sin(spread))
+      .addScaledVector(atk.fwd, Math.cos(spread));
+    m.dir.copy(_v1).normalize();
+    if (m.dir.y < -0.25) { m.dir.y = -0.25; m.dir.normalize(); }   // 発射直後に急降下しない
+    m.speed = Math.max(atk.speed * 0.9, 28);   // 発射時は機体の速度を引き継ぐ
+    m.burn = rand(K.burn[0], K.burn[1]);       // 推進剤の燃焼時間
+    m.nmax = rand(K.nmax[0], K.nmax[1]);       // 最大の旋回G（速度が低いほど小さく曲がれる）
+    m.turnRate = 0;
+    m.wA = rand(0.8, 2.0) * K.wob;
+    m.wf = rand(3, 7) * (Math.random() < 0.5 ? -1 : 1);
+    m.ph = rand(0, 6.2832);
+    m.life = rand(K.life[0], K.life[1]);
+    for (var i = 0; i < MTRAIL; i++) {
+      m.tp[i * 3] = m.pos.x; m.tp[i * 3 + 1] = m.pos.y; m.tp[i * 3 + 2] = m.pos.z;
+    }
+    m.last.copy(m.pos);
+    updTrail(m);
+  }
+
+  // dir を want の向きへ、最大 maxAng だけ回す
+  function turnToward(dir, want, maxAng) {
+    var ang = Math.acos(clamp(dir.dot(want), -1, 1));
+    if (ang < 1e-5) return;
+    if (ang <= maxAng) { dir.copy(want); return; }
+    _v5.crossVectors(dir, want);
+    if (_v5.lengthSq() < 1e-10) _v5.crossVectors(UP, dir);
+    if (_v5.lengthSq() < 1e-10) _v5.set(1, 0, 0);
+    _v5.normalize();
+    _q.setFromAxisAngle(_v5, maxAng);
+    dir.applyQuaternion(_q).normalize();
+  }
+
+  function stepMissile(m, dt) {
+    if (!m.alive) {
+      if (m.fade > 0) {
+        m.fade -= dt / 2.2;
+        m.mat.opacity = Math.max(0, m.fade);
+        if (m.fade <= 0) m.line.visible = false;
+      }
+      return;
+    }
+    m.age += dt;
+    m.turnRate = 0;
+    if (m.tgt && (!m.tgt.on || m.tgt.dead || m.tgt.arriving)) { m.tgt = nearestEnemy(m.pos, m.team); m.flare = null; }   // 標的が消えた・補充されて飛来中になったら、別の標的を狙う
+
+    // 誘導方式に合う囮（熱誘導はフレア、レーダー誘導はチャフ）に惑わされる（一度だけ）
+    if (!m.flare && m.fool && m.tgt && m.age > 0.7) {
+      var best = null, bd = 3600, pool = MISSILE[m.kind].decoy === 'chaff' ? chaffs : flares;
+      for (var q = 0; q < MAXF; q++) {
+        var fl = pool[q];
+        if (fl.life > 0 && fl.owner === m.tgt) {
+          var dd = fl.pos.distanceToSquared(m.pos);
+          if (dd < bd) { bd = dd; best = fl; }
+        }
+      }
+      if (best) m.flare = best;
+    }
+    if (m.flare && m.flare.life <= 0) { m.flare = null; m.fool = false; }
+
+    var ap = m.flare ? m.flare.pos : (m.tgt ? m.tgt.pos : null);
+    if (ap) {
+      _v1.subVectors(ap, m.pos);
+      var dist = _v1.length();
+      _v1.divideScalar(dist || 1);
+      // 視線に垂直な2軸で回転する「膨らみ」を足して、大きならせんを描かせる
+      _v2.crossVectors(_v1, UP);
+      if (_v2.lengthSq() < 1e-4) _v2.set(1, 0, 0);
+      _v2.normalize();
+      _v3.crossVectors(_v1, _v2);
+      var ph = m.ph + m.age * m.wf;
+      var amp = m.wA * Math.exp(-m.age * 0.55) * (dist > 25 ? 1 : dist / 25);
+      _v4.copy(_v1).addScaledVector(_v2, Math.cos(ph) * amp).addScaledVector(_v3, Math.sin(ph) * amp).normalize();
+      // 地面すれすれでは機首を上げる
+      var gy = Math.max(H(m.pos.x, m.pos.z), H(m.pos.x + m.dir.x * 22, m.pos.z + m.dir.z * 22)) + 12;
+      if (m.pos.y < gy) _v4.y += Math.min(2.5, (gy - m.pos.y) * 0.25);
+      _v4.normalize();
+      // 旋回できる角速度は速度で決まり、曲がるほどエネルギーを失う
+      var wmax = m.nmax * G / Math.max(m.speed, 20);
+      _v1.copy(m.dir);
+      turnToward(m.dir, _v4, wmax * dt);
+      m.turnRate = Math.acos(clamp(_v1.dot(m.dir), -1, 1)) / Math.max(dt, 1e-6);
+      if (dist < (m.flare ? 4 : 3.5)) {
+        explode(m.pos, m.flare ? 0.6 : MISSILE[m.kind].big);
+        if (!m.flare && m.tgt) hitTarget(m.tgt, m.team, MISSILE[m.kind].dmg, m.shooter, m.sgen);
+        killMissile(m);
+        return;
+      }
+    }
+    var nm = m.turnRate * m.speed / G;      // 旋回の負荷（G）
+    var macc = (m.age < m.burn ? MISSILE[m.kind].thrust : 0) - 0.004 * m.speed * m.speed - 0.05 * nm * nm - G * m.dir.y * 0.5;
+    m.speed = Math.max(0, m.speed + macc * dt);
+    m.pos.addScaledVector(m.dir, m.speed * dt);
+
+    if (m.pos.y < H(m.pos.x, m.pos.z) + 1) { explode(m.pos, 0.7); killMissile(m); return; }
+    if (m.age > m.life || (m.age > m.burn + 0.5 && m.speed < 20) || Math.abs(m.pos.x) > 320 || Math.abs(m.pos.z) > 320 || m.pos.y > 240) {
+      explode(m.pos, 0.8); killMissile(m); return;
+    }
+    if (m.pos.distanceToSquared(m.last) > 1.4) {
+      m.tp.copyWithin(0, 3);
+      var o = (MTRAIL - 1) * 3;
+      m.tp[o] = m.pos.x; m.tp[o + 1] = m.pos.y; m.tp[o + 2] = m.pos.z;
+      m.cnt++;
+      m.last.copy(m.pos);
+    }
+  }
+
+  /* ---------- 機銃（曳光弾） ---------- */
+  var MAXB = 480;                 // 同時に飛ぶ弾の数
+  var BULLET_SPEED = 220;         // 発射した機体から見た弾の速さ
+  var GUN_RANGE = 110, GUN_MIN = 22, GUN_AIM = 0.14;   // 射程・最短距離・撃ち始める狙いの誤差（約8°）
+  var GUN_INTERVAL = 0.055;       // 連射の間隔（約18発/秒）
+  var GUN_DMG = 0.05;             // 1発のダメージ（約20発でミサイル1発分）
+  var _gv = new THREE.Vector3(), _gr = new THREE.Vector3(), _gw = new THREE.Vector3();
+
+  var bu = {
+    p: new Float32Array(MAXB * 3), v: new Float32Array(MAXB * 3),
+    life: new Float32Array(MAXB), team: new Uint8Array(MAXB), sh: new Uint8Array(MAXB), sg: new Int32Array(MAXB), next: 0,
+    pos: new Float32Array(MAXB * 6), col: new Float32Array(MAXB * 6)
+  };
+  (function () {
+    var g = new THREE.BufferGeometry();
+    bu.pa = new THREE.BufferAttribute(bu.pos, 3); bu.pa.setUsage(THREE.DynamicDrawUsage);
+    bu.ca = new THREE.BufferAttribute(bu.col, 3); bu.ca.setUsage(THREE.DynamicDrawUsage);
+    g.setAttribute('position', bu.pa);
+    g.setAttribute('color', bu.ca);
+    bu.line = new THREE.LineSegments(g, new THREE.LineBasicMaterial({
+      vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false
+    }));
+    bu.line.frustumCulled = false;
+    scene.add(bu.line);
+  })();
+
+  function clearBullets() {
+    bu.life.fill(0);
+    bu.col.fill(0);
+    bu.ca.needsUpdate = true;
+  }
+
+  // 弾が当たる先読み点（_gv に向きを入れる）。弾は発射した機体の速度を引き継ぐ
+  function gunSolution(a, T) {
+    _gr.subVectors(T.pos, a.pos);
+    _gw.copy(T.fwd).multiplyScalar(T.speed).addScaledVector(a.fwd, -a.speed);   // 相対速度
+    var s = BULLET_SPEED;
+    var A = _gw.dot(_gw) - s * s, B = _gr.dot(_gw), C = _gr.dot(_gr);
+    var t = Math.sqrt(C) / s;
+    var disc = B * B - A * C;
+    if (disc >= 0 && Math.abs(A) > 1e-6) {
+      var sq = Math.sqrt(disc), t1 = (-B + sq) / A, t2 = (-B - sq) / A;
+      var tm = Math.min(t1 > 0 ? t1 : 1e9, t2 > 0 ? t2 : 1e9);
+      if (tm < 1e8) t = tm;
+    }
+    _gv.copy(_gr).addScaledVector(_gw, t).normalize();
+    return t;
+  }
+
+  function spawnBullet(a) {
+    var i = bu.next, o = i * 3;
+    bu.next = (i + 1) % MAXB;
+    _v1.copy(a.fwd).addScaledVector(a.rt, rand(-1, 1) * 0.012).addScaledVector(a.upv, rand(-1, 1) * 0.012).normalize();
+    var sp = BULLET_SPEED + a.speed;
+    var nose = 2.4 * state.size;
+    bu.p[o] = a.pos.x + a.fwd.x * nose; bu.p[o + 1] = a.pos.y + a.fwd.y * nose; bu.p[o + 2] = a.pos.z + a.fwd.z * nose;
+    bu.v[o] = _v1.x * sp; bu.v[o + 1] = _v1.y * sp; bu.v[o + 2] = _v1.z * sp;
+    bu.life[i] = 0.55;
+    bu.team[i] = a.team; bu.sh[i] = a.idx; bu.sg[i] = a.gen;
+  }
+
+  function stepBullets(h) {
+    if (!state.gun) return;
+    var rHit = 1.8 * state.size, r2 = rHit * rHit;
+    for (var i = 0; i < MAXB; i++) {
+      if (bu.life[i] <= 0) continue;
+      bu.life[i] -= h;
+      if (bu.life[i] <= 0) continue;
+      var o = i * 3;
+      var ax = bu.p[o], ay = bu.p[o + 1], az = bu.p[o + 2];
+      var bx = ax + bu.v[o] * h, by = ay + bu.v[o + 1] * h, bz = az + bu.v[o + 2] * h;
+      var team = bu.team[i];
+      var col = team === 0 ? 0 : 1;
+      if (by < H(bx, bz) + 0.5) {
+        emit(sparkP, bx, by, bz, rand(-4, 4), rand(2, 8), rand(-4, 4), 0.3, col ? 1 : 0.45, col ? 0.72 : 0.85, col ? 0.3 : 1);
+        bu.life[i] = 0;
+        continue;
+      }
+      var lo = team === 0 ? TGT0 : 0, hi = team === 0 ? MAXN : TGT0, hit = null;
+      var abx = bx - ax, aby = by - ay, abz = bz - az, ab2 = abx * abx + aby * aby + abz * abz;
+      for (var k = lo; k < hi; k++) {
+        var t = air[k];
+        if (!t.on || t.dead || t.arriving) continue;
+        var px = t.pos.x - ax, py = t.pos.y - ay, pz = t.pos.z - az;
+        var u = ab2 > 0 ? clamp((px * abx + py * aby + pz * abz) / ab2, 0, 1) : 0;
+        var dx = px - abx * u, dy = py - aby * u, dz = pz - abz * u;
+        if (dx * dx + dy * dy + dz * dz < r2) { hit = t; break; }
+      }
+      if (hit) {
+        hitTarget(hit, team, GUN_DMG, air[bu.sh[i]], bu.sg[i]);
+        for (var n = 0; n < 3; n++) {
+          emit(sparkP, bx, by, bz, rand(-9, 9), rand(-9, 9), rand(-9, 9), rand(0.2, 0.35), col ? 1 : 0.7, col ? 0.8 : 0.9, col ? 0.5 : 1);
+        }
+        bu.life[i] = 0;
+        continue;
+      }
+      bu.p[o] = bx; bu.p[o + 1] = by; bu.p[o + 2] = bz;
+    }
+  }
+
+  function syncBullets() {
+    for (var i = 0; i < MAXB; i++) {
+      var o3 = i * 3, o6 = i * 6;
+      if (bu.life[i] > 0) {
+        var px = bu.p[o3], py = bu.p[o3 + 1], pz = bu.p[o3 + 2];
+        bu.pos[o6] = px; bu.pos[o6 + 1] = py; bu.pos[o6 + 2] = pz;                        // 先端
+        bu.pos[o6 + 3] = px - bu.v[o3] * 0.04; bu.pos[o6 + 4] = py - bu.v[o3 + 1] * 0.04; bu.pos[o6 + 5] = pz - bu.v[o3 + 2] * 0.04;   // 尾
+        var c0 = bu.team[i] === 0 ? 0.45 : 1.0, c1 = bu.team[i] === 0 ? 0.85 : 0.72, c2 = bu.team[i] === 0 ? 1.0 : 0.3;
+        bu.col[o6] = c0; bu.col[o6 + 1] = c1; bu.col[o6 + 2] = c2;
+        bu.col[o6 + 3] = c0 * 0.15; bu.col[o6 + 4] = c1 * 0.15; bu.col[o6 + 5] = c2 * 0.15;
+      } else {
+        bu.col[o6] = 0; bu.col[o6 + 1] = 0; bu.col[o6 + 2] = 0; bu.col[o6 + 3] = 0; bu.col[o6 + 4] = 0; bu.col[o6 + 5] = 0;
+      }
+    }
+    bu.pa.needsUpdate = true;
+    bu.ca.needsUpdate = true;
+  }
+
+  // 連射の管理: 狙いが合ったら1〜2秒のバーストで撃ち、そのあと間を空ける
+  function gunControl(a, h) {
+    var okStart = a.gunD >= GUN_MIN && a.gunD <= GUN_RANGE && a.gunErr < GUN_AIM;
+    if (a.gunBurst > 0) {
+      a.gunBurst -= h;
+      a.gunAcc += h;
+      var ok = a.gunD <= GUN_RANGE * 1.2 && a.gunErr < GUN_AIM * 2;
+      while (a.gunAcc >= GUN_INTERVAL) {
+        a.gunAcc -= GUN_INTERVAL;
+        if (ok) spawnBullet(a);
+      }
+      if (a.gunBurst <= 0) a.gunCool = rand(1.0, 2.5);
+    } else {
+      a.gunCool -= h;
+      if (a.gunCool <= 0 && okStart) { a.gunBurst = rand(1.2, 2.4); a.gunAcc = GUN_INTERVAL; }
+    }
+  }
+
+  function initCombat(a) {
+    a.threat = 1e9; a.dist = 1e9; a.aim = 3;
+    a.salvoLeft = 0; a.salvoT = 0; a.fireT = rand(0.5, 2.5);
+    a.flareT = 0; a.flareLeft = 0; a.flareGap = 0;
+    a.chaffT = 0; a.chaffLeft = 0; a.chaffGap = 0; a.threatKind = 'ir';
+    a.retargetT = 0;
+    a.gunBurst = 0; a.gunCool = rand(0.5, 1.5); a.gunAcc = 0; a.gunD = 1e9; a.gunErr = 3; a.gunThreat = 1e9;
+  }
+
+  function clearTrail(a) {
+    var p = a.trailPos;
+    for (var i = 0; i < CAP * 2; i++) {
+      p[i * 3] = a.pos.x; p[i * 3 + 1] = a.pos.y; p[i * 3 + 2] = a.pos.z;
+    }
+    a.count = 0;
+    a.last.copy(a.pos);
+    a.posAttr.needsUpdate = true;
+  }
+
+  /* ---------- 機体スロット・耐久力・撃墜と補充 ----------
+     スロット 0〜15 が攻撃側、16〜31 が逃げる側（追撃戦・追従カメラのとき）。
+     軌跡だけを眺めるモードでは、先頭から「矢印の数」だけ使う。 */
+  var TGT0 = 16;
+
+  function slotOn(i) {
+    if (state.mode === 'free') return i < state.count;
+    return i < state.nAtk || (i >= TGT0 && i < TGT0 + state.nTgt);
+  }
+
+  // team の機体から見た、いちばん近い敵（生きていて、飛来中でないもの）
+  function nearestEnemy(pos, team) {
+    var lo = team === 0 ? TGT0 : 0, hi = team === 0 ? MAXN : TGT0;
+    var best = null, bd = 1e12;
+    for (var i = lo; i < hi; i++) {
+      var t = air[i];
+      if (!t.on || t.dead || t.arriving) continue;
+      var d = t.pos.distanceToSquared(pos);
+      if (d < bd) { bd = d; best = t; }
+    }
+    return best;
+  }
+
+  function colorFor(a) {
+    if (state.mode === 'free' || !a.role) return PALETTE[a.idx % PALETTE.length];
+    if (a.ace) return ACE_COLOR;
+    if (state.mode === 'duel') {
+      return a.team === 0 ? ((a.idx % 2) ? 0x9be7ff : 0x5cd6ff) : ((a.idx % 2) ? 0xffd08a : 0xffb347);   // A: 水色系、B: 琥珀系
+    }
+    if (a.role === 'atk') return 0x5cd6ff;
+    return (a.idx % 2) ? 0xffb347 : 0xe6f3ff;      // 標的: 琥珀と氷色
+  }
+  function applyColor(a) {
+    var hex = colorFor(a);
+    a.color.setHex(hex);
+    a.fillMat.color.copy(a.color);
+    a.edgeCol.copy(a.color).lerp(WHITE, a.ace ? 0.2 : 0.45);
+    a.edgeMat.color.copy(a.edgeCol);
+    a.drop.material.color.copy(a.color);
+    paintTrail(a);
+  }
+
+  // 機体を（再）配置する。how: 'scatter' = 戦闘開始時の配置、'arrive' = 遠方から飛来
+  function spawnAircraft(a, how) {
+    reset(a);
+    a.gen++;
+    a.dead = false; a.fade = 0; a.flash = 0; a.arriving = false;
+    a.ace = false; a.kills = 0;
+    a.hpMax = state.hp; a.hp = state.hp;
+    a.mKind = MISSILE_KINDS[Math.floor(Math.random() * MISSILE_KINDS.length)];    // 機体ごとに生成時に決めて固定する
+    a.trailMat.opacity = 1;
+    a.ribbon.visible = true;
+    a.arrow.visible = true; a.drop.visible = true;
+    a.root.visible = true;
+    applyColor(a);
+    if (how === 'arrive') {
+      // 範囲のはるか外（約600）から、戦場へ向かって高速で飛んでくる。交戦では自陣側（A: 左、B: 右）から
+      var ang = state.mode === 'duel' ? (a.team === 0 ? Math.PI : 0) + rand(-0.7, 0.7) : rand(0, 6.2832);
+      a.pos.set(Math.cos(ang) * 600, rand(50, 90), Math.sin(ang) * 600);
+      a.arrP.set(rand(-0.3 * R, 0.3 * R), 45, rand(-0.3 * R, 0.3 * R));
+      var yaw = Math.atan2(a.arrP.x - a.pos.x, a.arrP.z - a.pos.z);
+      a.q.setFromAxisAngle(UP, yaw);
+      a.wYaw = yaw;
+      basis(a);
+      a.speed = 70;
+      a.arriving = true;
+      clearTrail(a);
+    } else if (state.mode === 'duel') {
+      // 交戦の開始: チームAは左から、チームBは右から、向かい合って飛ぶ
+      a.pos.set((a.team === 0 ? -0.45 : 0.45) * R + rand(-15, 15), rand(35, 60), rand(-0.5 * R, 0.5 * R));
+      var yw = a.team === 0 ? Math.PI / 2 : -Math.PI / 2;
+      a.q.setFromAxisAngle(UP, yw);
+      a.wYaw = yw;
+      basis(a);
+      clearTrail(a);
+    } else if (state.mode === 'chase' && a.role === 'tgt') {
+      a.pos.set(rand(-0.4 * R, 0.4 * R), rand(30, 55), rand(-0.4 * R, 0.4 * R));
+      clearTrail(a);
+    }
+  }
+
+  // 使う機体の集合と役割を更新する。full = true なら全機を最初から配置し直す
+  function refreshActive(full) {
+    var i, a;
+    for (i = 0; i < MAXN; i++) {
+      a = air[i];
+      var on = slotOn(i);
+      a.role = null; a.tgt = null;
+      if (on && state.mode === 'duel') a.role = 'duel';
+      else if (on && state.mode === 'chase') a.role = i < TGT0 ? 'atk' : 'tgt';
+      var was = a.on;
+      a.on = on;
+      if (!on) { a.root.visible = false; a.dead = false; a.arriving = false; continue; }
+      if (full || !was) spawnAircraft(a, (full || state.mode === 'free') ? 'scatter' : 'arrive');
+    }
+    if (full && state.mode === 'chase') {
+      // 攻撃側は、どれかの標的の少し後ろから追いかける配置にする
+      for (i = 0; i < TGT0; i++) {
+        a = air[i];
+        if (!a.on) continue;
+        var cands = [];
+        for (var k = TGT0; k < MAXN; k++) if (air[k].on) cands.push(air[k]);
+        if (!cands.length) continue;
+        var t = cands[Math.floor(Math.random() * cands.length)];
+        var ty = Math.atan2(t.fwd.x, t.fwd.z), ay = ty + rand(-0.35, 0.35);
+        a.q.setFromAxisAngle(UP, ay);
+        a.wYaw = ay;
+        basis(a);
+        _v1.set(Math.sin(ty), 0, Math.cos(ty));
+        a.pos.copy(t.pos).addScaledVector(_v1, -(80 + rand(0, 30)));
+        a.pos.x += rand(-25, 25); a.pos.y += rand(-12, 12); a.pos.z += rand(-25, 25);
+        clearTrail(a);
+      }
+    }
+    if (full && state.ace) assignStartAces();
+    if (full) { state.followObj = null; state.followGen = 0; }
+  }
+
+  /* ---------- エース機 ----------
+     開始時は各チームの攻撃する側の1機がエース。撃墜数が ACE_KILLS に達した機体も昇格する。 */
+  var ACE_KILLS = 3, ACE_HP = 1.5, ACE_TURN = 1.1, ACE_SALVO = 2, ACE_TRAIL = 1.35, ACE_COLOR = 0xffd54a;
+
+  function maxHpOf(a) { return a.ace ? Math.max(state.hp + 1, Math.ceil(state.hp * ACE_HP)) : state.hp; }
+
+  // 耐久力の上限を変え、残りの割合を保って現在値を換算する
+  function rescaleHp(a) {
+    var frac = a.hpMax > 0 ? a.hp / a.hpMax : 1;
+    a.hpMax = maxHpOf(a);
+    if (!a.dead) a.hp = Math.max(1, Math.ceil(frac * a.hpMax - 1e-6));
+  }
+
+  function setAce(a, on) {
+    if (a.ace === on) return;
+    a.ace = on;
+    rescaleHp(a);
+    applyColor(a);
+  }
+
+  // 昇格のとき、耐久力の増えた分だけ現在値も増やす
+  function promoteAce(a) {
+    var before = a.hpMax;
+    a.ace = true; a.hpMax = maxHpOf(a);
+    a.hp = Math.min(a.hpMax, a.hp + (a.hpMax - before));
+    applyColor(a);
+    emit(flashP, a.pos.x, a.pos.y, a.pos.z, 0, 0, 0, 0.5, 1, 0.85, 0.35);
+    for (var i = 0; i < 24; i++) {
+      var u = rand(-1, 1), th = rand(0, 6.2832), r = Math.sqrt(1 - u * u), sp = rand(8, 22);
+      emit(sparkP, a.pos.x, a.pos.y, a.pos.z, r * Math.cos(th) * sp, u * sp, r * Math.sin(th) * sp, rand(0.6, 1.2), 1, 0.85, 0.3);
+    }
+  }
+
+  function creditKill(shooter, sgen) {
+    if (!shooter || !shooter.on || shooter.dead || shooter.gen !== sgen) return;
+    shooter.kills++;
+    if (state.ace && !shooter.ace && shooter.kills >= ACE_KILLS) promoteAce(shooter);
+  }
+
+  // 戦闘の開始時に、攻撃する側の先頭の1機をエースにする
+  function assignStartAces() {
+    if (state.mode === 'free') return;
+    var lo = [0, TGT0], hi = [TGT0, MAXN];
+    for (var t = 0; t < 2; t++) {
+      if (state.mode === 'chase' && t === 1) break;
+      for (var i = lo[t]; i < hi[t]; i++) {
+        if (air[i].on) { setAce(air[i], true); break; }
+      }
+    }
+  }
+
+  // 被弾: 耐久力を1減らす。0になったら撃墜（byTeam: 撃った側のチーム）
+  function hitTarget(a, byTeam, dmg, shooter, sgen) {
+    if (a.dead || (a.role !== 'tgt' && a.role !== 'duel')) return;
+    var d = dmg === undefined ? 1 : dmg;      // ミサイル1発 = 1、機銃1発 = 0.05
+    a.hp -= d;
+    a.flash = Math.max(a.flash, d >= 1 ? 1 : 0.6);
+    if (a.hp <= 0) destroyAircraft(a, byTeam, shooter, sgen);
+  }
+  function destroyAircraft(a, byTeam, shooter, sgen) {
+    a.dead = true;
+    a.fade = 1;
+    a.respawnT = state.respawn;    // 設定した時間が経ったら、遠方から補充機が飛来する
+    a.arrow.visible = false;
+    a.drop.visible = false;
+    orient(a);
+    writeRibbonPoint(a, (CAP - 1) * 6);
+    leaveGhost(a);                 // 軌跡は別枠に移して、補充機とは関係なく薄れさせる
+    a.ribbon.visible = false;
+    a.man = null; a.direct = null;
+    a.flareLeft = 0; a.chaffLeft = 0; a.salvoLeft = 0; a.threat = 1e9;
+    var team = byTeam === 0 || byTeam === 1 ? byTeam : 1 - a.team;
+    state.score[team]++;
+    creditKill(shooter, sgen);
+    explode(a.pos, 2.2);
+    for (var k = 0; k < 3; k++) {
+      emit(flashP, a.pos.x + rand(-3, 3), a.pos.y + rand(-3, 3), a.pos.z + rand(-3, 3), 0, 0, 0, rand(0.4, 0.6), 1, 0.8, 0.5);
+    }
+  }
+
+  /* 撃墜された機体の軌跡は、機体とは別枠（ゴースト）に写して、約2.2秒かけて薄れさせる */
+  var MAXG = 24, GHOSTS = [];
+  for (var gi = 0; gi < MAXG; gi++) {
+    var gh = { fade: 0, pos: new Float32Array(CAP * 6), col: new Float32Array(CAP * 6) };
+    gh.geo = new THREE.BufferGeometry();
+    gh.pa = new THREE.BufferAttribute(gh.pos, 3);
+    gh.ca = new THREE.BufferAttribute(gh.col, 3);
+    gh.geo.setAttribute('position', gh.pa);
+    gh.geo.setAttribute('color', gh.ca);
+    gh.geo.setIndex(new THREE.BufferAttribute(trailIndex, 1));
+    gh.geo.setDrawRange(0, 0);
+    gh.mat = trailMat.clone();
+    gh.mesh = new THREE.Mesh(gh.geo, gh.mat);
+    gh.mesh.frustumCulled = false;
+    gh.mesh.visible = false;
+    scene.add(gh.mesh);
+    GHOSTS.push(gh);
+  }
+  function leaveGhost(a) {
+    var g = null, i;
+    for (i = 0; i < MAXG; i++) { if (GHOSTS[i].fade <= 0) { g = GHOSTS[i]; break; } }
+    if (!g) {                                   // 空きがなければ、いちばん薄れたものを使う
+      g = GHOSTS[0];
+      for (i = 1; i < MAXG; i++) if (GHOSTS[i].fade < g.fade) g = GHOSTS[i];
+    }
+    g.pos.set(a.trailPos);
+    g.col.set(a.trailCol);
+    g.pa.needsUpdate = true; g.ca.needsUpdate = true;
+    var n = Math.min(a.count, state.len) + 1;
+    g.geo.setDrawRange((CAP - n) * 6, (n - 1) * 6);
+    g.fade = 1; g.mat.opacity = 1; g.mesh.visible = true;
+  }
+  function stepGhost(g, h) {
+    if (g.fade <= 0) return;
+    g.fade = Math.max(0, g.fade - h / 2.2);
+    g.mat.opacity = g.fade;
+    if (g.fade <= 0) g.mesh.visible = false;
+  }
+
+  function clearBattle() {
+    var i, Ps = [sparkP, flashP, mHeads, hvHeads, fHeads, cHeads];
+    for (i = 0; i < MAXM; i++) {
+      missiles[i].alive = false; missiles[i].fade = 0;
+      missiles[i].mat.opacity = 0; missiles[i].line.visible = false;
+    }
+    for (i = 0; i < MAXF; i++) { flares[i].life = 0; chaffs[i].life = 0; }
+    for (i = 0; i < Ps.length; i++) {
+      Ps[i].life.fill(0); Ps[i].col.fill(0); Ps[i].ca.needsUpdate = true;
+    }
+    for (i = 0; i < MAXN; i++) {
+      var a = air[i];
+      a.salvoLeft = 0; a.flareLeft = 0; a.chaffLeft = 0; a.evade = 0; a.threat = 1e9;
+    }
+    for (i = 0; i < MAXG; i++) { GHOSTS[i].fade = 0; GHOSTS[i].mesh.visible = false; }
+    state.score = [0, 0];
+    clearBullets();
+  }
+
+  function stepBattle(h) {
+    var i, m, a;
+    for (i = 0; i < MAXN; i++) { air[i].threat = 1e9; air[i].gunThreat = 1e9; }
+    for (i = 0; i < MAXM; i++) {
+      m = missiles[i];
+      if (m.alive && m.tgt && !m.flare) {
+        var d = m.pos.distanceTo(m.tgt.pos);
+        if (d < m.tgt.threat) {
+          m.tgt.threat = d;
+          m.tgt.threatKind = m.kind;
+          m.tgt.threatDir.subVectors(m.pos, m.tgt.pos).divideScalar(d || 1);
+        }
+      }
+    }
+    for (i = 0; i < MAXN; i++) {
+      a = air[i];
+      if (!a.on) continue;
+      if (a.dead) {
+        // 撃墜された機体: 時間が来たら、遠方から補充機を出す（軌跡は別枠で薄れている）
+        a.respawnT -= h;
+        if (a.respawnT <= 0) spawnAircraft(a, 'arrive');
+        continue;
+      }
+      if (a.arriving) continue;     // 飛来中は、まだ戦闘に加わらない
+      if (a.role === 'atk' || a.role === 'duel') {
+        // いちばん近い敵を狙う（切り替えは、明らかに近い敵が現れたときだけ）
+        a.retargetT -= h;
+        var valid = a.tgt && a.tgt.on && !a.tgt.dead && !a.tgt.arriving;
+        if (a.retargetT <= 0 || !valid) {
+          a.retargetT = 0.3;
+          var nt = nearestEnemy(a.pos, a.team);
+          if (!valid) a.tgt = nt;
+          else if (nt && nt !== a.tgt && nt.pos.distanceToSquared(a.pos) * 1.5 < a.tgt.pos.distanceToSquared(a.pos)) a.tgt = nt;
+        }
+        if (a.tgt) {
+          a.fireT -= h;
+          if (a.salvoLeft > 0) {
+            a.salvoT -= h;
+            while (a.salvoLeft > 0 && a.salvoT <= 0) { spawnMissile(a); a.salvoLeft--; a.salvoT += 0.04; }
+            if (a.salvoLeft <= 0) a.fireT = rand(5, 8);
+          } else if (a.fireT <= 0 && !a.man && a.dist < MISSILE[a.mKind].rMax && a.dist > MISSILE[a.mKind].rMin && a.aim < 0.5) {
+            a.salvoLeft = state.volley + (a.ace ? ACE_SALVO : 0);
+            a.salvoT = 0;
+          }
+          if (state.gun && !a.man) {
+            gunControl(a, h);
+            // 後ろから機銃で狙われている相手に知らせる（正面から向かい合っているときは回避しない）
+            if (a.gunD < 120 && a.gunErr < 0.3) {
+              var v = a.tgt;
+              _hv.subVectors(v.pos, a.pos).normalize();
+              if (_hv.dot(v.fwd) > 0.3 && a.gunD < v.gunThreat) {
+                v.gunThreat = a.gunD;
+                if (v.threat > 1e8) v.threatDir.copy(_hv).negate();
+              }
+            }
+          }
+        }
+      }
+      if (a.role === 'tgt' || a.role === 'duel') {
+        a.flareT -= h;
+        if (a.flareLeft > 0) {
+          a.flareGap -= h;
+          if (a.flareGap <= 0) { spawnFlare(a); a.flareLeft--; a.flareGap = 0.09; }
+        } else if (a.flareT <= 0 && a.threat < 100 && MISSILE[a.threatKind].decoy === 'flare') {
+          a.flareLeft = 6; a.flareGap = 0; a.flareT = 2.2;
+        }
+        a.chaffT -= h;
+        if (a.chaffLeft > 0) {
+          a.chaffGap -= h;
+          if (a.chaffGap <= 0) { spawnChaff(a); a.chaffLeft--; a.chaffGap = 0.09; }
+        } else if (a.chaffT <= 0 && a.threat < 100 && MISSILE[a.threatKind].decoy === 'chaff') {
+          a.chaffLeft = 6; a.chaffGap = 0; a.chaffT = 2.2;
+        }
+      }
+    }
+    for (i = 0; i < MAXG; i++) stepGhost(GHOSTS[i], h);
+    for (i = 0; i < MAXM; i++) stepMissile(missiles[i], h);
+    for (i = 0; i < MAXF; i++) { stepFlare(flares[i], h); stepChaff(chaffs[i], h); }
+    stepBullets(h);
+  }
+
+  function syncBattle() {
+    var i, o, m, f, k;
+    for (i = 0; i < MAXM; i++) {
+      m = missiles[i]; o = i * 3;
+      // 重爆型は、大きな点を描く別枠に入れる
+      var H1 = m.alive && m.kind === 'heavy' ? hvHeads : mHeads, H0 = H1 === mHeads ? hvHeads : mHeads;
+      H0.col[o] = 0; H0.col[o + 1] = 0; H0.col[o + 2] = 0;
+      if (m.alive) {
+        H1.pos[o] = m.pos.x; H1.pos[o + 1] = m.pos.y; H1.pos[o + 2] = m.pos.z;
+        H1.col[o] = m.head[0]; H1.col[o + 1] = m.head[1]; H1.col[o + 2] = m.head[2];
+        updTrail(m);
+      } else {
+        H1.col[o] = 0; H1.col[o + 1] = 0; H1.col[o + 2] = 0;
+      }
+    }
+    mHeads.pa.needsUpdate = true; mHeads.ca.needsUpdate = true;
+    hvHeads.pa.needsUpdate = true; hvHeads.ca.needsUpdate = true;
+    for (i = 0; i < MAXF; i++) {
+      f = flares[i]; o = i * 3;
+      if (f.life > 0) {
+        k = Math.min(1, f.life / f.mlife * 2);
+        fHeads.pos[o] = f.pos.x; fHeads.pos[o + 1] = f.pos.y; fHeads.pos[o + 2] = f.pos.z;
+        fHeads.col[o] = k; fHeads.col[o + 1] = 0.85 * k; fHeads.col[o + 2] = 0.55 * k;
+      } else {
+        fHeads.col[o] = 0; fHeads.col[o + 1] = 0; fHeads.col[o + 2] = 0;
+      }
+    }
+    fHeads.pa.needsUpdate = true; fHeads.ca.needsUpdate = true;
+    for (i = 0; i < MAXF; i++) {
+      f = chaffs[i]; o = i * 3;
+      if (f.life > 0) {
+        k = Math.min(1, f.life / f.mlife * 2);
+        cHeads.pos[o] = f.pos.x; cHeads.pos[o + 1] = f.pos.y; cHeads.pos[o + 2] = f.pos.z;
+        cHeads.col[o] = 0.6 * k; cHeads.col[o + 1] = k; cHeads.col[o + 2] = 0.8 * k;
+      } else {
+        cHeads.col[o] = 0; cHeads.col[o + 1] = 0; cHeads.col[o + 2] = 0;
+      }
+    }
+    cHeads.pa.needsUpdate = true; cHeads.ca.needsUpdate = true;
+    syncBullets();
+  }
+
+  /* ---------- カメラ ---------- */
+  var cam = { yaw: 0.6, pitch: 0.38, pitchOb: 0.38, dist: 260, target: new THREE.Vector3(0, 26, 0) };
+
+  function resize() {
+    var w = window.innerWidth, h = window.innerHeight;
+    renderer.setSize(w, h);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener('resize', resize);
+  resize();
+  if (camera.aspect < 1) cam.dist = 400;
+
+  function updateCamera(dt) {
+    // 視点（斜め／真上）へなめらかに移る
+    var goal = state.view === 'top' ? Math.PI / 2 : cam.pitchOb;
+    cam.pitch += (goal - cam.pitch) * (1 - Math.exp(-5 * dt));
+    // 真上では「画面の上」を水平方向に取り直す（上方向と視線が重ならないように）
+    var t = clamp((cam.pitch - 1.2) / (Math.PI / 2 - 1.2), 0, 1);
+    camera.up.set(0, 1, 0).multiplyScalar(1 - t)
+      .add(_v1.set(-Math.sin(cam.yaw), 0, -Math.cos(cam.yaw)).multiplyScalar(t)).normalize();
+    var cp = Math.cos(cam.pitch);
+    camera.position.set(
+      cam.target.x + cam.dist * cp * Math.sin(cam.yaw),
+      cam.target.y + cam.dist * Math.sin(cam.pitch),
+      cam.target.z + cam.dist * cp * Math.cos(cam.yaw)
+    );
+    camera.lookAt(cam.target);
+    // 霧は距離に合わせる（近づいたときに遠景を消しすぎない）
+    scene.fog.near = cam.dist * 0.65;
+    scene.fog.far = cam.dist * 2.0;
+  }
+
+  var canvas = $('c');
+  var hint = $('hint');
+  var ptrs = new Map();
+  var pinchD = 0;
+  function hideHint() { hint.classList.add('gone'); }
+  function pinchDistance() {
+    var v = Array.from(ptrs.values());
+    return Math.hypot(v[0].x - v[1].x, v[0].y - v[1].y);
+  }
+  canvas.addEventListener('pointerdown', function (e) {
+    canvas.setPointerCapture(e.pointerId);
+    ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (ptrs.size === 2) pinchD = pinchDistance();
+    hideHint();
+  });
+  canvas.addEventListener('pointermove', function (e) {
+    var prev = ptrs.get(e.pointerId);
+    if (!prev) return;
+    var dx = e.clientX - prev.x, dy = e.clientY - prev.y;
+    prev.x = e.clientX; prev.y = e.clientY;
+    if (ptrs.size === 1) {
+      cam.yaw -= dx * 0.0055;
+      if (state.view !== 'top') {
+        cam.pitchOb = clamp(cam.pitchOb + dy * 0.004, -0.05, 1.4);
+        cam.pitch = cam.pitchOb;
+      }
+    } else if (ptrs.size === 2) {
+      var nd = pinchDistance();
+      if (pinchD > 0 && nd > 0) cam.dist = clamp(cam.dist * (pinchD / nd), 80, 520);
+      pinchD = nd;
+    }
+  });
+  function endPointer(e) { ptrs.delete(e.pointerId); pinchD = 0; }
+  canvas.addEventListener('pointerup', endPointer);
+  canvas.addEventListener('pointercancel', endPointer);
+  canvas.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    cam.dist = clamp(cam.dist * Math.exp(e.deltaY * 0.0012), 80, 520);
+    hideHint();
+  }, { passive: false });
+
+  /* ---------- 設定UI ---------- */
+  function applyCount() {
+    refreshActive(false);
+    updateFollowUI();
+  }
+
+  function bind(id, key, fmt, onChange) {
+    var el = $(id), out = $(id + 'V');
+    function upd() {
+      state[key] = parseFloat(el.value);
+      out.textContent = fmt(state[key]);
+      if (onChange) onChange();
+    }
+    el.addEventListener('input', upd);
+    upd();
+  }
+
+  bind('count', 'count', function (v) { return String(v); }, applyCount);
+  bind('speed', 'speed', function (v) { return '×' + v.toFixed(1); });
+  bind('len', 'len', function (v) { return String(v); }, function () {
+    for (var i = 0; i < MAXN; i++) {
+      air[i].count = Math.min(air[i].count, state.len);
+      paintTrail(air[i]);
+    }
+  });
+  bind('size', 'size', function (v) { return '×' + v.toFixed(1); }, function () {
+    for (var i = 0; i < MAXN; i++) {
+      air[i].arrow.scale.setScalar(state.size);
+      paintTrail(air[i]);
+    }
+  });
+
+  var autoEl = $('auto');
+  autoEl.checked = state.auto;
+  autoEl.addEventListener('change', function () { state.auto = autoEl.checked; });
+
+  var terrainEl = $('terrain');
+  terrainEl.addEventListener('change', function () {
+    state.terrain = terrainEl.checked;
+    terrain.visible = state.terrain;
+  });
+
+  $('reset').addEventListener('click', function () {
+    clearBattle();
+    refreshActive(true);
+    updateFollowUI();
+  });
+
+  var volleyRow = $('volleyRow');
+  bind('volley', 'volley', function (v) { return String(v); });
+  bind('respawn', 'respawn', function (v) { return v.toFixed(1) + '秒'; });
+  bind('nAtk', 'nAtk', function (v) { return String(v); }, applyCount);
+  bind('nTgt', 'nTgt', function (v) { return String(v); }, applyCount);
+  bind('hp', 'hp', function (v) { return String(v); }, function () {
+    // 設定を変えたとき、生きている標的の耐久力を割合を保ったまま換算する
+    for (var i = 0; i < MAXN; i++) {
+      rescaleHp(air[i]);
+    }
+  });
+
+  var countRow = $('countRow'), atkRow = $('atkRow'), tgtRow = $('tgtRow'), hpRow = $('hpRow');
+  var followCamEl = $('followCam');
+  var camSaved = cam.dist;
+
+  function setFollowCam(on) {
+    if (on === state.followCam) return;
+    state.followCam = on;
+    if (on) { camSaved = cam.dist; cam.dist = 140; }
+    else { cam.dist = camSaved; cam.target.set(0, 26, 0); }
+    followCamEl.checked = on;
+    updateFollowUI();
+  }
+
+  function setMode(mode) {
+    var prev = state.mode;
+    state.mode = mode;
+    var battle = mode !== 'free';
+    volleyRow.hidden = !battle;
+    countRow.hidden = battle;
+    atkRow.hidden = !battle; tgtRow.hidden = !battle; hpRow.hidden = !battle;
+    $('respawnRow').hidden = !battle;
+    $('followCamRow').hidden = !battle;
+    $('gunRow').hidden = !battle;
+    $('aceRow').hidden = !battle;
+    $('nAtkL').textContent = mode === 'duel' ? 'チームAの数' : '攻撃側の数';
+    $('nTgtL').textContent = mode === 'duel' ? 'チームBの数' : '逃げる側の数';
+    if (!battle && state.followCam) setFollowCam(false);
+    // モードを変えるときは、配置と役割を最初からやり直す（色やチームが変わるため）
+    if (prev !== mode) {
+      state.followTeam = mode === 'duel' ? 'both' : 'B';    // 交戦は両方、追撃戦は逃げる側（これまでどおり）
+      syncFollowTeamUI();
+      clearBattle();
+      refreshActive(true);
+    }
+    updateFollowUI();
+  }
+
+  /* 追従カメラ: 追っている機体が撃墜されたらカメラは止まる。飛来中の機体は、到着するまで追わない */
+  function teamMatch(a) {
+    var t = state.followTeam;
+    return t === 'both' || (t === 'A' ? a.team === 0 : a.team === 1);
+  }
+  function followEligible(a) {
+    return a.on && !a.dead && !a.arriving && teamMatch(a);
+  }
+  function followValid() {
+    var f = state.followObj;
+    return !!f && f.on && !f.dead && f.gen === state.followGen;
+  }
+  function setFollow(a) { state.followObj = a; state.followGen = a ? a.gen : 0; }
+  // 今の機体の次のスロットから、追える機体を探す
+  function pickNext() {
+    var start = state.followObj ? state.followObj.idx : -1;
+    for (var k = 1; k <= MAXN; k++) {
+      var c = air[((start + k) % MAXN + MAXN) % MAXN];
+      if (followEligible(c)) return c;
+    }
+    return null;
+  }
+  function pickNearestTo(pos) {
+    var best = null, bd = 1e12;
+    for (var q = 0; q < MAXN; q++) {
+      var c = air[q];
+      if (!followEligible(c)) continue;
+      var d2 = c.pos.distanceToSquared(pos);
+      if (d2 < bd) { bd = d2; best = c; }
+    }
+    return best;
+  }
+  function updateFollowUI() {
+    var on = state.followCam && state.mode !== 'free';
+    $('followRow').hidden = !on;
+    $('hud').hidden = !on;
+    if (on && !followValid() && !state.followObj) setFollow(pickNearestTo(cam.target));
+  }
+  var hudText = '', hudKey = '';
+  function updateHud() {
+    var f = state.followObj, text, pct, low = false;
+    if (followValid()) {
+      var who, noHp = false;
+      if (state.mode === 'duel') who = 'チーム' + (f.team === 0 ? 'A' : 'B') + ' ' + (f.idx % TGT0 + 1) + '番機';
+      else if (f.role === 'atk') { who = '攻撃側 ' + (f.idx + 1) + '番機'; noHp = true; }   // 追撃戦の攻撃側は被弾しない
+      else who = '標的 ' + (f.idx - TGT0 + 1);
+      text = '追従中: ' + (f.ace ? 'ACE ' : '') + who + (f.ace || f.kills > 0 ? '　撃墜 ' + f.kills : '') + (noHp ? '' : '　耐久力 ' + Math.ceil(f.hp - 1e-6) + ' / ' + f.hpMax);
+      pct = noHp ? 100 : f.hp / f.hpMax * 100;
+      low = !noHp && pct <= 25;
+    } else if (f) {
+      text = '撃墜されました（「次の機体」で切り替え）';
+      pct = 0;
+    } else {
+      text = '追える機体がありません';
+      pct = 0;
+    }
+    if (text !== hudText) { $('hudLabel').textContent = text; hudText = text; }
+    var key = pct + (low ? 'L' : '');
+    if (key !== hudKey) {
+      $('hudBar').style.width = pct + '%';
+      $('hudBar').className = low ? 'low' : '';
+      hudKey = key;
+    }
+  }
+
+  var scoreKey = '';
+  function updateScore() {
+    var show = state.mode === 'duel';
+    var key = (show ? 'S' : 'H') + state.score[0] + ':' + state.score[1];
+    if (key === scoreKey) return;
+    scoreKey = key;
+    $('score').hidden = !show;
+    if (show) { $('scoreAn').textContent = state.score[0]; $('scoreBn').textContent = state.score[1]; }
+  }
+
+  var viewObl = $('viewObl'), viewTop = $('viewTop');
+  viewObl.addEventListener('change', function () { if (viewObl.checked) state.view = 'oblique'; });
+  viewTop.addEventListener('change', function () { if (viewTop.checked) state.view = 'top'; });
+  var modeFree = $('modeFree'), modeChase = $('modeChase'), modeDuel = $('modeDuel');
+  modeFree.addEventListener('change', function () { if (modeFree.checked) setMode('free'); });
+  modeChase.addEventListener('change', function () { if (modeChase.checked) setMode('chase'); });
+  modeDuel.addEventListener('change', function () { if (modeDuel.checked) setMode('duel'); });
+  followCamEl.addEventListener('change', function () { setFollowCam(followCamEl.checked); });
+  $('nextTarget').addEventListener('click', function () {
+    var nx = pickNext();
+    if (nx) setFollow(nx);
+  });
+  var gunEl = $('gun');
+  gunEl.addEventListener('change', function () {
+    state.gun = gunEl.checked;
+    if (!state.gun) clearBullets();
+  });
+  var aceEl = $('ace');
+  aceEl.addEventListener('change', function () {
+    state.ace = aceEl.checked;
+    // オフにしたら、すぐ全機が普通に戻る。オンの開始時エースは「最初から」のときに作られる
+    if (!state.ace) for (var i = 0; i < MAXN; i++) setAce(air[i], false);
+  });
+  var autoNextEl = $('autoNext');
+  autoNextEl.addEventListener('change', function () { state.autoNext = autoNextEl.checked; });
+
+  // 追従するチームの選択（ラベルと選択状態を、モードに合わせて更新する）
+  function syncFollowTeamUI() {
+    $('ftAL').textContent = state.mode === 'duel' ? 'チームA' : '攻撃側';
+    $('ftBL').textContent = state.mode === 'duel' ? 'チームB' : '逃げる側';
+    $('ftA').checked = state.followTeam === 'A';
+    $('ftB').checked = state.followTeam === 'B';
+    $('ftBoth').checked = state.followTeam === 'both';
+  }
+  function setFollowTeam(t) {
+    state.followTeam = t;
+    // 追っている機体が選んだチームでなければ、そのチームのいちばん近い機体へ切り替える
+    var f = state.followObj;
+    if (!f || !followValid() || !teamMatch(f)) setFollow(pickNearestTo(cam.target));
+  }
+  $('ftA').addEventListener('change', function () { if ($('ftA').checked) setFollowTeam('A'); });
+  $('ftB').addEventListener('change', function () { if ($('ftB').checked) setFollowTeam('B'); });
+  $('ftBoth').addEventListener('change', function () { if ($('ftBoth').checked) setFollowTeam('both'); });
+
+  var pauseBtn = $('pause');
+  pauseBtn.addEventListener('click', function () {
+    state.paused = !state.paused;
+    pauseBtn.textContent = state.paused ? '再開' : '一時停止';
+    pauseBtn.setAttribute('aria-pressed', String(state.paused));
+  });
+
+  var panel = $('panel'), toggle = $('toggle');
+  function setPanel(open) {
+    panel.hidden = !open;
+    toggle.setAttribute('aria-expanded', String(open));
+  }
+  toggle.addEventListener('click', function () { setPanel(panel.hidden); });
+  setPanel(window.innerWidth >= 720);
+
+  /* ---------- ループ ---------- */
+  var lastT = performance.now();
+  function frame(now) {
+    requestAnimationFrame(frame);
+    var dt = Math.min(0.05, Math.max(0, (now - lastT) / 1000));
+    lastT = now;
+
+    if (!state.paused) {
+      var sd = dt * state.speed;
+      var steps = Math.max(1, Math.ceil(sd / STEP_MAX));
+      var h = sd / steps;
+      for (var s = 0; s < steps; s++) {
+        for (var i = 0; i < MAXN; i++) { var ai = air[i]; if (ai.on && !ai.dead) stepAircraft(ai, h); }
+        if (state.mode !== 'free') stepBattle(h);
+      }
+      if (state.mode !== 'free') {
+        stepParticles(sparkP, sd, 5, 0.9);
+        stepParticles(flashP, sd, 0, 2.5);
+      }
+    }
+    for (var j = 0; j < MAXN; j++) { var aj = air[j]; if (aj.on && !aj.dead) sync(aj); }
+    if (state.mode !== 'free') syncBattle();
+
+    if (state.auto && ptrs.size === 0) cam.yaw += 0.07 * dt;
+    if (state.followCam && state.mode !== 'free') {
+      // 追う機体を常に画面の中心にとらえる
+      if (!followValid() && (state.autoNext || !state.followObj)) {
+        // 撃墜後の自動切り替え（オプション）。撃墜位置にいちばん近い、追える機体へ
+        var best = pickNearestTo(cam.target);
+        if (best) setFollow(best);
+      }
+      if (followValid()) cam.target.lerp(state.followObj.pos, 1 - Math.exp(-14 * dt));   // 追えなくなったらその場で停止
+      updateHud();
+    }
+    updateScore();
+    updateCamera(dt);
+    renderer.render(scene, camera);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
