@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>とけいのれんしゅう</title>
+<style>
+  :root { color-scheme: light dark; --bg:#f4f6fb; --surface:#fff; --ink:#1c2438; --muted:#5d6a85; --line:#dde3ef; --accent:#4f6bed; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#11151f; --surface:#1a2030; --ink:#e8ecf6; --muted:#9aa6c0; --line:#2b3550; --accent:#8da2ff; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); line-height:1.8;
+    font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif; }
+  main { max-width: 52rem; margin: 0 auto; padding: 32px 16px 64px; }
+  nav a { color: var(--accent); }
+  article { margin-top: 16px; padding: 8px 24px 24px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow-wrap: anywhere; }
+  h1 { font-size: 1.6rem; }
+  h2 { margin-top: 2rem; padding-left: 12px; border-left: 4px solid var(--accent); font-size: 1.25rem; }
+  a { color: var(--accent); }
+  code { padding: 1px 5px; border-radius: 4px; background: var(--bg); font-size: .9em; }
+  pre { padding: 12px 16px; border-radius: 8px; background: var(--bg); overflow-x: auto; }
+  pre code { padding: 0; background: none; }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; }
+  th, td { padding: 6px 10px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+  th { background: var(--bg); }
+</style>
+</head>
+<body>
+<main>
+<nav><a href="../../">&larr; toy-box 一覧へ</a> / <a href="./">プロトタイプを開く</a></nav>
+<article>
+<h1>とけいのれんしゅう</h1>
+<p>アナログ時計とデジタル表示を並べて、<strong>分単位まで時計を読む</strong>練習をするためのブラウザ試作です。対象は小学校1〜3年生を想定しています。</p>
+<ul>
+<li>成果物：単一のHTMLファイル（<code>index.html</code>）</li>
+<li>試作リンク：<a href="https://takedatakumi.github.io/toy-box/tools/clock-learning/">https://takedatakumi.github.io/toy-box/tools/clock-learning/</a></li>
+</ul>
+<h2>操作</h2>
+<div class="table-wrap"><table><thead><tr>
+<th>操作</th>
+<th>動作</th>
+</tr>
+</thead><tbody><tr>
+<td>竜頭を右にドラッグ（またはタップ、「竜頭をひく」ボタン）</td>
+<td>竜頭が引き出され、秒針が止まる</td>
+</tr>
+<tr>
+<td>引き出したまま竜頭を上下にドラッグ（またはホイール、↑↓キー）</td>
+<td>長針が回り、短針も連動して動く</td>
+</tr>
+<tr>
+<td>デジタルの▲▼</td>
+<td>時・分を1つずつ変える（押し続けると連続で変わる）</td>
+</tr>
+<tr>
+<td>「いまのじかんにあわせる」ボタン(竜頭を引き出している間だけ押せる)</td>
+<td>端末の現在の時・分・秒に合わせて竜頭を押し込み、秒針が動き出す</td>
+</tr>
+<tr>
+<td>竜頭を左にドラッグ（またはタップ、「竜頭をおしこむ」ボタン）</td>
+<td>合わせた時刻から秒針が動き出す</td>
+</tr>
+</tbody></table></div><h2>設計上の決め事</h2>
+<ul>
+<li>短針と長針は、デジタルの「時」「分」と同じ色にして、針と数字の対応が分かるようにしている</li>
+<li>文字盤には、時の数字（1〜12）と分の数字（5〜60）を表示する。分の数字は切り替えで隠せる</li>
+<li>竜頭を回したときは、長針が1周すると短針が進む（時計と同じ連動）</li>
+<li>デジタルの分の▲▼は、時を繰り上げずに0〜59で循環する</li>
+<li>時刻の変更と「いまのじかんにあわせる」は、竜頭を引き出している間だけ有効にしている</li>
+<li>表示は12時間（午前・午後つき）が初期値で、24時間表示に切り替えられる</li>
+<li>時刻の入力は▲▼とドラッグのみで、数値の直接入力は持たない（不正な時刻が入らない）</li>
+</ul>
+
+</article>
+</main>
+</body>
+</html>
