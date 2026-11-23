@@ -967,17 +967,23 @@
   var _e1 = new THREE.Vector3(), _e2 = new THREE.Vector3(), _en = new THREE.Vector3();
   var _q = new THREE.Quaternion();
 
+  // 光る点の画像。色は純白のまま、透明度だけを計算で作る。2Dの放射状グラデーションから作ると、
+  // iOSのSafariが色にノイズを混ぜ、大きな点（光輪など）で、赤や緑や黒の斑になる
   var dotTex = (function () {
-    var c = document.createElement('canvas');
-    c.width = 64; c.height = 64;
-    var g = c.getContext('2d');
-    var gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-    gr.addColorStop(0, 'rgba(255,255,255,1)');
-    gr.addColorStop(0.35, 'rgba(255,255,255,0.55)');
-    gr.addColorStop(1, 'rgba(255,255,255,0)');
-    g.fillStyle = gr;
-    g.fillRect(0, 0, 64, 64);
-    return new THREE.CanvasTexture(c);
+    var N = 128, data = new Uint8Array(N * N * 4);
+    for (var y = 0; y < N; y++) {
+      for (var x = 0; x < N; x++) {
+        var r = Math.hypot(x + 0.5 - N / 2, y + 0.5 - N / 2) / (N / 2);
+        var al = r >= 1 ? 0 : r <= 0.35 ? 1 - 0.45 * (r / 0.35) : 0.55 * (1 - (r - 0.35) / 0.65);
+        var o = (y * N + x) * 4;
+        data[o] = 255; data[o + 1] = 255; data[o + 2] = 255; data[o + 3] = Math.round(al * 255);
+      }
+    }
+    var t = new THREE.DataTexture(data, N, N, THREE.RGBAFormat);
+    t.magFilter = THREE.LinearFilter;
+    t.minFilter = THREE.LinearFilter;
+    t.needsUpdate = true;
+    return t;
   })();
 
   // 光る点の集まり（火花・閃光・ミサイルの先端・フレア）
