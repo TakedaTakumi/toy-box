@@ -3,9 +3,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build:docs": "node scripts/build-docs.mjs"
+    "build:docs": "node scripts/build-docs.mjs",
+    "test": "node --test tests/*.test.mjs"
   },
   "devDependencies": {
+    "fast-check": "4.10.2",
     "marked": "12.0.2"
   }
 }
