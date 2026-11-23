@@ -217,6 +217,7 @@
       <label class="check"><input id="viewObl" type="radio" name="view" value="oblique" checked>斜め</label>
       <label class="check"><input id="viewTop" type="radio" name="view" value="top">真上</label>
       <label class="check" id="viewFpRow" hidden><input id="viewFp" type="radio" name="view" value="fp">主観</label>
+      <label class="check" id="viewTpsRow" hidden><input id="viewTps" type="radio" name="view" value="tps">後方（TPS）</label>
     </fieldset>
     <label class="check" id="starsRow" hidden><input id="stars" type="checkbox" checked>星空（主観）</label>
     <label class="check" id="attRow" hidden><input id="att" type="checkbox" checked>姿勢表示（主観）</label>
@@ -1950,7 +1951,47 @@
     c.setLineDash([]);
   }
 
+  // 後方視点（TPS）: 追っている機体の後ろ・少し上から、機体の向きを見る。向きと位置は、少し遅れて追従し、ロールは半分だけ追う
+  var TPS_BACK = 25, TPS_UP = 8, TPS_FOV = 55, TPS_DIST_MIN = 15, TPS_DIST_MAX = 80;
+  var tps = { dist: TPS_BACK, pos: new THREE.Vector3(), sq: new THREE.Quaternion(), obj: null, gen: 0 };
+  var _tq1 = new THREE.Quaternion(), _tq2 = new THREE.Quaternion(), _tq3 = new THREE.Quaternion(), _tq4 = new THREE.Quaternion();
+  var _tm = new THREE.Matrix4(), _tr = new THREE.Vector3(), _tu = new THREE.Vector3(), _tp = new THREE.Vector3();
+
+  // 機首は同じで、水平を保った向きに、機体のロールの半分だけ傾けた向き
+  function tpsTargetQuat(a, out) {
+    var f = a.fwd;
+    if (Math.abs(f.y) > 0.98) return out.copy(a.q);   // ほぼ真上・真下を向いているときは、水平を決められない
+    _tr.crossVectors(UP, f).normalize();
+    _tu.crossVectors(f, _tr);
+    _tm.makeBasis(_tr, _tu, f);
+    _tq1.setFromRotationMatrix(_tm);
+    _tq2.copy(_tq1).invert().multiply(a.q);
+    _tq3.identity().slerp(_tq2, 0.5);
+    return out.copy(_tq1).multiply(_tq3);
+  }
+
+  function updateThirdPerson(dt) {
+    setFov(TPS_FOV);
+    scene.fog.near = 170; scene.fog.far = 520;
+    if (!followValid()) return;                       // 撃墜されたら、その場で止まる
+    var a = state.followObj;
+    tpsTargetQuat(a, _tq4);
+    var fresh = tps.obj !== a || tps.gen !== a.gen;   // 追う機体が変わったときは、追従せずに、すぐ置く
+    if (fresh) tps.sq.copy(_tq4); else tps.sq.slerp(_tq4, 1 - Math.exp(-6 * dt));
+    var e = clamp(Math.atan2(TPS_UP, TPS_BACK) + look.pitch, -1.0, 1.45);
+    _tp.set(Math.sin(look.yaw) * Math.cos(e), Math.sin(e), -Math.cos(look.yaw) * Math.cos(e))
+      .multiplyScalar(tps.dist).applyQuaternion(tps.sq).add(a.pos);
+    if (fresh) tps.pos.copy(_tp); else tps.pos.lerp(_tp, 1 - Math.exp(-8 * dt));
+    tps.obj = a; tps.gen = a.gen;
+    camera.position.copy(tps.pos);
+    camera.position.y = Math.max(camera.position.y, H(camera.position.x, camera.position.z) + 2);   // 地面の下にもぐらない
+    camera.up.set(0, 1, 0).applyQuaternion(tps.sq);
+    _tp.set(0, 0, 1).applyQuaternion(tps.sq).multiplyScalar(12 * Math.cos(look.yaw)).add(a.pos);    // 機体の少し前を見る（横に回り込んだら、機体を見る）
+    camera.lookAt(_tp);
+  }
+
   function updateCamera(dt) {
+    if (state.view === 'tps') { updateThirdPerson(dt); return; }
     if (state.view === 'fp') { updateFirstPerson(dt); return; }
     setFov(DEFAULT_FOV);
     // 視点（斜め／真上）へなめらかに移る
@@ -1997,6 +2038,15 @@
         look.yaw = clamp(look.yaw - dx * 0.005, -LOOK_YAW, LOOK_YAW);
         look.pitch = clamp(look.pitch - dy * 0.004, -LOOK_PITCH, LOOK_PITCH);
       }
+    } else if (state.view === 'tps') {
+      if (ptrs.size === 1) {                        // 機体を中心に回り込む（左右は全周）
+        look.yaw -= dx * 0.0055;
+        look.pitch = clamp(look.pitch + dy * 0.004, -LOOK_PITCH, LOOK_PITCH);
+      } else if (ptrs.size === 2) {
+        var td = pinchDistance();
+        if (pinchD > 0 && td > 0) tps.dist = clamp(tps.dist * (pinchD / td), TPS_DIST_MIN, TPS_DIST_MAX);
+        pinchD = td;
+      }
     } else if (ptrs.size === 1) {
       cam.yaw -= dx * 0.0055;
       if (state.view !== 'top') {
@@ -2014,6 +2064,7 @@
   canvas.addEventListener('pointercancel', endPointer);
   canvas.addEventListener('wheel', function (e) {
     e.preventDefault();
+    if (state.view === 'tps') { tps.dist = clamp(tps.dist * Math.exp(e.deltaY * 0.0012), TPS_DIST_MIN, TPS_DIST_MAX); hideHint(); return; }
     if (state.view === 'fp') return;
     cam.dist = clamp(cam.dist * Math.exp(e.deltaY * 0.0012), 80, maxZoom());
     hideHint();
@@ -2115,7 +2166,7 @@
     if (on) { camSaved = cam.dist; cam.dist = 140; }
     else { cam.dist = camSaved; cam.target.set(0, 26, 0); }
     followCamEl.checked = on;
-    if (!on && state.view === 'fp') { state.view = 'oblique'; $('viewObl').checked = true; syncFpUI(); }   // 追う機体がないので、主観をやめる
+    if (!on && (state.view === 'fp' || state.view === 'tps')) { state.view = 'oblique'; $('viewObl').checked = true; syncFpUI(); }   // 追う機体がないので、主観・後方をやめる
     updateFollowUI();
   }
 
@@ -2131,6 +2182,7 @@
     $('gunRow').hidden = !battle;
     $('aceRow').hidden = !battle;
     $('viewFpRow').hidden = !battle;
+    $('viewTpsRow').hidden = !battle;
     $('nAtkL').textContent = mode === 'duel' ? 'チームAの数' : '攻撃側の数';
     $('nTgtL').textContent = mode === 'duel' ? 'チームBの数' : '逃げる側の数';
     if (!battle && state.followCam) setFollowCam(false);
@@ -2221,12 +2273,14 @@
     if (show) { $('scoreAn').textContent = state.score[0]; $('scoreBn').textContent = state.score[1]; }
   }
 
-  // 主観のときだけ、星空と姿勢表示のチェックボックスを出し、ヒントの文を、見回しの説明にする
+  // 主観・後方のときだけ、星空のチェックボックスを出す（姿勢表示は、主観のときだけ）。ヒントの文も、視点に合わせる
   function syncFpUI() {
-    var fp = state.view === 'fp';
-    $('starsRow').hidden = !fp;
+    var fp = state.view === 'fp', third = state.view === 'tps';
+    $('starsRow').hidden = !fp && !third;
     $('attRow').hidden = !fp;
-    $('hint').textContent = fp ? 'ドラッグで見回す（離すと前向きに戻る）' : 'ドラッグで回転、ホイールやピンチで拡大縮小';
+    $('hint').textContent = fp ? 'ドラッグで見回す（離すと前向きに戻る）'
+      : third ? 'ドラッグで回り込む（離すと真後ろに戻る）、ホイールで距離'
+      : 'ドラッグで回転、ホイールやピンチで拡大縮小';
   }
   var viewObl = $('viewObl'), viewTop = $('viewTop');
   viewObl.addEventListener('change', function () { if (viewObl.checked) { state.view = 'oblique'; syncFpUI(); } });
@@ -2238,8 +2292,17 @@
   viewFp.addEventListener('change', function () {
     if (!viewFp.checked) return;
     state.view = 'fp';
+    look.yaw = 0; look.pitch = 0;
     syncFpUI();
     if (!state.followCam) setFollowCam(true);    // 主観は、追従カメラで追っている機体から見る
+  });
+  var viewTps = $('viewTps');
+  viewTps.addEventListener('change', function () {
+    if (!viewTps.checked) return;
+    state.view = 'tps';
+    look.yaw = 0; look.pitch = 0;
+    syncFpUI();
+    if (!state.followCam) setFollowCam(true);    // 後方も、追従カメラで追っている機体の後ろから見る
   });
   var modeFree = $('modeFree'), modeChase = $('modeChase'), modeDuel = $('modeDuel');
   modeFree.addEventListener('change', function () { if (modeFree.checked) setMode('free'); });
@@ -2330,8 +2393,11 @@
     if (state.mode !== 'free') syncBattle();
     syncAceHalo();
 
-    if (state.auto && ptrs.size === 0 && state.view !== 'fp') cam.yaw += 0.07 * dt;
-    if (ptrs.size === 0) { var back = Math.exp(-3 * dt); look.yaw *= back; look.pitch *= back; }
+    if (state.auto && ptrs.size === 0 && state.view !== 'fp' && state.view !== 'tps') cam.yaw += 0.07 * dt;
+    if (ptrs.size === 0) {
+      if (state.view === 'tps') look.yaw = wrapPi(look.yaw);   // 回り込んだあとは、近い向きから、真後ろに戻る
+      var back = Math.exp(-3 * dt); look.yaw *= back; look.pitch *= back;
+    }
     if (state.followCam && state.mode !== 'free') {
       // 追う機体を常に画面の中心にとらえる
       if (followValid()) {
@@ -2355,7 +2421,7 @@
     updateScore();
     updateCamera(dt);
     var fpOn = state.view === 'fp';
-    stars.visible = fpOn && state.stars;
+    stars.visible = (fpOn || state.view === 'tps') && state.stars;
     if (stars.visible) stars.position.copy(camera.position);
     drawAttitude(fpOn && state.att);
     renderer.render(scene, camera);
