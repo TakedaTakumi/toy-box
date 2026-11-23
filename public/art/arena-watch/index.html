@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>アリーナ観戦</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0b1220;
+    --ink: #e6f3ff;
+    --muted: #8fa6bf;
+    --panel: rgba(8, 16, 28, 0.76);
+    --line: rgba(130, 190, 230, 0.22);
+    color-scheme: dark;
+  }
+  html, body {
+    height: 100%;
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic", "Noto Sans JP", system-ui, sans-serif;
+    font-size: 14px;
+    overflow: hidden;
+  }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  #hud {
+    position: fixed;
+    right: max(16px, env(safe-area-inset-right));
+    bottom: max(16px, env(safe-area-inset-bottom));
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    backdrop-filter: blur(6px);
+  }
+  #who { display: flex; align-items: center; gap: 8px; min-width: 7em; }
+  #swatch { width: 12px; height: 12px; border-radius: 50%; }
+  button {
+    font: inherit;
+    color: var(--ink);
+    background: rgba(92, 214, 255, 0.14);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 6px 12px;
+    cursor: pointer;
+  }
+  button:hover { background: rgba(92, 214, 255, 0.26); }
+  button:focus-visible { outline: 2px solid #5cd6ff; outline-offset: 2px; }
+  #hint {
+    position: fixed;
+    left: max(16px, env(safe-area-inset-left));
+    top: max(16px, env(safe-area-inset-top));
+    color: var(--muted);
+    font-size: 12px;
+  }
+</style>
+</head>
+<body>
+<div id="hint">アリーナ観戦 ／ 画面をタップでキャラ切替</div>
+<div id="hud">
+  <div id="who"><span id="swatch"></span><span id="name"></span></div>
+  <button id="next" type="button">次のキャラ</button>
+  <button id="auto" type="button" aria-pressed="true">自動切替: ON</button>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+  const ARENA = 40;
+  const TEAMS = [
+    { name: 'ブルー', color: 0x3a8dff, accent: 0x9fd0ff },
+    { name: 'レッド', color: 0xe5484d, accent: 0xffb3b0 },
+  ];
+  const BOTS_PER_TEAM = 3;
+  const AUTO_SWITCH_SEC = 10;
+  const BOT_RADIUS = 0.5;
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.prepend(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x9ec3e6);
+  scene.fog = new THREE.Fog(0x9ec3e6, 40, 140);
+
+  const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 300);
+
+  scene.add(new THREE.HemisphereLight(0xdcecff, 0x4a5a40, 0.9));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.8);
+  sun.position.set(30, 50, 20);
+  scene.add(sun);
+
+  function gridTexture() {
+    const size = 256;
+    const c = document.createElement('canvas');
+    c.width = c.height = size;
+    const g = c.getContext('2d');
+    g.fillStyle = '#5d6b57';
+    g.fillRect(0, 0, size, size);
+    g.strokeStyle = 'rgba(255,255,255,0.18)';
+    g.lineWidth = 3;
+    g.strokeRect(0, 0, size, size);
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(ARENA * 2 / 4, ARENA * 2 / 4);
+    t.anisotropy = 4;
+    return t;
+  }
+
+  const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(ARENA * 2, ARENA * 2),
+    new THREE.MeshLambertMaterial({ map: gridTexture() })
+  );
+  ground.rotation.x = -Math.PI / 2;
+  scene.add(ground);
+
+  // 遮蔽物は [x, z, 幅, 高さ, 奥行き]
+  const OBSTACLES = [
+    [0, 0, 6, 3, 6],
+    [-18, -12, 4, 2, 10],
+    [18, 12, 4, 2, 10],
+    [-14, 16, 5, 2.5, 3],
+    [14, -16, 5, 2.5, 3],
+    [0, -26, 12, 2, 2.5],
+    [0, 26, 12, 2, 2.5],
+  ].map(([x, z, w, h, d]) => ({ x, z, hw: w / 2, hd: d / 2, h }));
+
+  const crateMat = new THREE.MeshLambertMaterial({ color: 0x8a8f98 });
+  for (const o of OBSTACLES) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(o.hw * 2, o.h, o.hd * 2), crateMat);
+    m.position.set(o.x, o.h / 2, o.z);
+    scene.add(m);
+  }
+
+  function buildHumanoid(team) {
+    const body = new THREE.MeshLambertMaterial({ color: team.color });
+    const trim = new THREE.MeshLambertMaterial({ color: team.accent });
+    const dark = new THREE.MeshLambertMaterial({ color: 0x2b2f36 });
+    const visorMat = new THREE.MeshBasicMaterial({ color: 0xffc94d });
+
+    const root = new THREE.Group();
+
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.8, 0.4), body);
+    torso.position.y = 1.35;
+    root.add(torso);
+    const pack = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.2), dark);
+    pack.position.set(0, 1.4, -0.28);
+    root.add(pack);
+
+    const head = new THREE.Group();
+    head.position.y = 1.95;
+    head.add(new THREE.Mesh(new THREE.SphereGeometry(0.26, 16, 12), trim));
+    const visor = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.14, 0.12), visorMat);
+    visor.position.set(0, 0.02, 0.2);
+    head.add(visor);
+    root.add(head);
+
+    function limb(w, h, mat, x, y) {
+      const pivot = new THREE.Group();
+      pivot.position.set(x, y, 0);
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), mat);
+      mesh.position.y = -h / 2;
+      pivot.add(mesh);
+      root.add(pivot);
+      return pivot;
+    }
+    const armL = limb(0.22, 0.75, body, -0.46, 1.7);
+    const armR = limb(0.22, 0.75, body, 0.46, 1.7);
+    const legL = limb(0.28, 0.95, dark, -0.18, 0.95);
+    const legR = limb(0.28, 0.95, dark, 0.18, 0.95);
+
+    const gun = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.14, 0.7), dark);
+    gun.position.set(0, -0.6, 0.3);
+    armR.add(gun);
+    armR.rotation.x = -1.1;
+
+    return { root, armL, armR, legL, legR };
+  }
+
+  const bots = [];
+  TEAMS.forEach((team, ti) => {
+    for (let i = 0; i < BOTS_PER_TEAM; i++) {
+      const parts = buildHumanoid(team);
+      const bot = {
+        team,
+        label: team.name + ' ' + (i + 1),
+        ...parts,
+        pos: new THREE.Vector3((ti ? 1 : -1) * (ARENA - 6), 0, (i - 1) * 8),
+        heading: ti ? -Math.PI / 2 : Math.PI / 2,
+        speed: 0,
+        target: null,
+        phase: Math.random() * 6.28,
+        idle: 0,
+      };
+      scene.add(bot.root);
+      bots.push(bot);
+    }
+  });
+
+  function inObstacle(x, z, pad) {
+    return OBSTACLES.some(o => Math.abs(x - o.x) < o.hw + pad && Math.abs(z - o.z) < o.hd + pad);
+  }
+
+  function pickTarget() {
+    for (let n = 0; n < 30; n++) {
+      const x = (Math.random() * 2 - 1) * (ARENA - 3);
+      const z = (Math.random() * 2 - 1) * (ARENA - 3);
+      if (!inObstacle(x, z, 1.5)) return new THREE.Vector3(x, 0, z);
+    }
+    return new THREE.Vector3(0, 0, ARENA - 10);
+  }
+
+  function pushOut(p) {
+    for (const o of OBSTACLES) {
+      const dx = p.x - o.x, dz = p.z - o.z;
+      const ox = o.hw + BOT_RADIUS - Math.abs(dx);
+      const oz = o.hd + BOT_RADIUS - Math.abs(dz);
+      if (ox > 0 && oz > 0) {
+        if (ox < oz) p.x += Math.sign(dx || 1) * ox;
+        else p.z += Math.sign(dz || 1) * oz;
+      }
+    }
+    const lim = ARENA - BOT_RADIUS;
+    p.x = Math.max(-lim, Math.min(lim, p.x));
+    p.z = Math.max(-lim, Math.min(lim, p.z));
+  }
+
+  function angleDiff(a, b) {
+    let d = b - a;
+    while (d > Math.PI) d -= Math.PI * 2;
+    while (d < -Math.PI) d += Math.PI * 2;
+    return d;
+  }
+
+  const WALK_SPEED = 4;
+
+  function updateBot(b, dt) {
+    if (b.idle > 0) {
+      b.idle -= dt;
+      b.speed = 0;
+    } else {
+      if (!b.target) b.target = pickTarget();
+      const dx = b.target.x - b.pos.x, dz = b.target.z - b.pos.z;
+      if (Math.hypot(dx, dz) < 1) {
+        b.target = null;
+        b.idle = 0.5 + Math.random() * 1.5;
+        b.speed = 0;
+      } else {
+        const want = Math.atan2(dx, dz);
+        const turn = angleDiff(b.heading, want);
+        b.heading += Math.sign(turn) * Math.min(Math.abs(turn), 3 * dt);
+        b.speed = Math.abs(turn) > 1 ? 0 : WALK_SPEED;
+        const prev = b.pos.clone();
+        b.pos.x += Math.sin(b.heading) * b.speed * dt;
+        b.pos.z += Math.cos(b.heading) * b.speed * dt;
+        pushOut(b.pos);
+        if (b.pos.distanceTo(prev) < b.speed * dt * 0.4) b.target = null;
+      }
+    }
+
+    b.phase += (b.speed / WALK_SPEED) * dt * 9;
+    const swing = Math.sin(b.phase) * 0.7 * (b.speed / WALK_SPEED);
+    b.legL.rotation.x = swing;
+    b.legR.rotation.x = -swing;
+    b.armL.rotation.x = -swing * 0.6;
+    b.root.position.set(b.pos.x, Math.abs(Math.sin(b.phase)) * 0.05 * (b.speed / WALK_SPEED), b.pos.z);
+    b.root.rotation.y = b.heading;
+  }
+
+  const hud = {
+    name: document.getElementById('name'),
+    swatch: document.getElementById('swatch'),
+    auto: document.getElementById('auto'),
+  };
+  let focus = 0;
+  let auto = true;
+  let sinceSwitch = 0;
+
+  function setFocus(i) {
+    focus = (i + bots.length) % bots.length;
+    sinceSwitch = 0;
+    hud.name.textContent = bots[focus].label;
+    hud.swatch.style.background = '#' + bots[focus].team.color.toString(16).padStart(6, '0');
+  }
+  setFocus(0);
+
+  document.getElementById('next').addEventListener('click', () => setFocus(focus + 1));
+  hud.auto.addEventListener('click', () => {
+    auto = !auto;
+    hud.auto.textContent = '自動切替: ' + (auto ? 'ON' : 'OFF');
+    hud.auto.setAttribute('aria-pressed', String(auto));
+  });
+  renderer.domElement.addEventListener('pointerdown', () => setFocus(focus + 1));
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  const camPos = new THREE.Vector3();
+  const camLook = new THREE.Vector3();
+  const wantPos = new THREE.Vector3();
+  const wantLook = new THREE.Vector3();
+  let camReady = false;
+
+  function updateCamera(dt) {
+    const b = bots[focus];
+    wantPos.set(
+      b.pos.x - Math.sin(b.heading) * 5,
+      3.2,
+      b.pos.z - Math.cos(b.heading) * 5
+    );
+    wantLook.set(b.pos.x, 1.5, b.pos.z);
+    if (!camReady) {
+      camPos.copy(wantPos);
+      camLook.copy(wantLook);
+      camReady = true;
+    }
+    const k = 1 - Math.exp(-4 * dt);
+    camPos.lerp(wantPos, k);
+    camLook.lerp(wantLook, k);
+    camera.position.copy(camPos);
+    camera.lookAt(camLook);
+  }
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min((now - last) / 1000, 0.05);
+    last = now;
+    for (const b of bots) updateBot(b, dt);
+    sinceSwitch += dt;
+    if (auto && sinceSwitch > AUTO_SWITCH_SEC) setFocus(focus + 1);
+    updateCamera(dt);
+    renderer.render(scene, camera);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
