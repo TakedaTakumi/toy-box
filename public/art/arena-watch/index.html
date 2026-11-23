@@ -162,24 +162,31 @@
     head.add(visor);
     root.add(head);
 
-    function limb(w, h, mat, x, y) {
+    function limb(w, upper, lower, mat, x, y) {
       const pivot = new THREE.Group();
       pivot.position.set(x, y, 0);
-      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), mat);
-      mesh.position.y = -h / 2;
-      pivot.add(mesh);
+      const upperMesh = new THREE.Mesh(new THREE.BoxGeometry(w, upper, w), mat);
+      upperMesh.position.y = -upper / 2;
+      pivot.add(upperMesh);
+      const joint = new THREE.Group();
+      joint.position.y = -upper;
+      const lowerMesh = new THREE.Mesh(new THREE.BoxGeometry(w * 0.9, lower, w * 0.9), mat);
+      lowerMesh.position.y = -lower / 2;
+      joint.add(lowerMesh);
+      pivot.add(joint);
       root.add(pivot);
-      return pivot;
+      return { pivot, joint };
     }
-    const armL = limb(0.22, 0.75, body, -0.46, 1.7);
-    const armR = limb(0.22, 0.75, body, 0.46, 1.7);
-    const legL = limb(0.28, 0.95, dark, -0.18, 0.95);
-    const legR = limb(0.28, 0.95, dark, 0.18, 0.95);
+    const armL = limb(0.22, 0.38, 0.37, body, -0.46, 1.7);
+    const armR = limb(0.22, 0.38, 0.37, body, 0.46, 1.7);
+    const legL = limb(0.28, 0.48, 0.47, dark, -0.18, 0.95);
+    const legR = limb(0.28, 0.48, 0.47, dark, 0.18, 0.95);
 
     const gun = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.14, 0.7), dark);
-    gun.position.set(0, -0.6, 0.3);
-    armR.add(gun);
-    armR.rotation.x = -1.1;
+    gun.position.set(0, -0.35, 0.3);
+    armR.joint.add(gun);
+    armR.pivot.rotation.x = -0.9;
+    armR.joint.rotation.x = -0.8;
 
     return { root, armL, armR, legL, legR };
   }
@@ -266,10 +273,15 @@
     }
 
     b.phase += (b.speed / WALK_SPEED) * dt * 9;
-    const swing = Math.sin(b.phase) * 0.7 * (b.speed / WALK_SPEED);
-    b.legL.rotation.x = swing;
-    b.legR.rotation.x = -swing;
-    b.armL.rotation.x = -swing * 0.6;
+    const gait = b.speed / WALK_SPEED;
+    const swing = Math.sin(b.phase) * 0.7 * gait;
+    b.legL.pivot.rotation.x = swing;
+    b.legR.pivot.rotation.x = -swing;
+    // 膝は脚を前から後ろへ振るときだけ後ろに曲がる
+    b.legL.joint.rotation.x = Math.max(0, -Math.cos(b.phase)) * 0.9 * gait;
+    b.legR.joint.rotation.x = Math.max(0, Math.cos(b.phase)) * 0.9 * gait;
+    b.armL.pivot.rotation.x = -swing * 0.6;
+    b.armL.joint.rotation.x = -0.25 - Math.abs(swing) * 0.5;
     b.root.position.set(b.pos.x, Math.abs(Math.sin(b.phase)) * 0.05 * (b.speed / WALK_SPEED), b.pos.z);
     b.root.rotation.y = b.heading;
   }
