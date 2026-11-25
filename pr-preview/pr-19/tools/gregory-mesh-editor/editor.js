@@ -11,7 +11,7 @@ const state = {
   model: M.PRESETS.cube.make(),
   mode: 'v', sel: new Set(), primary: new Set(),
   mirror: false, axis: 'free', shading: 'smooth', tau: 1, N: 8, extrude: 0.4,
-  show: { surface: true, curves: true, cage: true, ctrl: false },
+  show: { surface: true, curves: true, cage: true, ctrl: false, gizmo: true },
   yaw: 0.75, pitch: 0.45, dist: 8.6,
 };
 const undoStack = [], redoStack = [];
@@ -396,7 +396,107 @@ function draw() {
     ctx.lineWidth = 2; ctx.strokeStyle = tok('--stage'); ctx.stroke();
     return s;
   });
+
+  computeGizmo(cam);
+  drawGizmo(tok);
 }
+
+// ---- 移動ハンドル ----
+const GIZMO_PX = 84;
+const PLANES = { xy: ['x', 'y', 'z'], yz: ['y', 'z', 'x'], zx: ['z', 'x', 'y'] };
+let gizmo = null, hoverHandle = null;
+
+function gizmoCenter() {
+  const items = state.primary.size ? state.primary : state.sel;
+  if (!items.size) return null;
+  const verts = [...vertsOf(items)].filter((v) => state.model.V[v]);
+  if (!verts.length) return null;
+  return mul(verts.reduce((acc, v) => add(acc, state.model.V[v]), [0, 0, 0]), 1 / verts.length);
+}
+
+function computeGizmo(cam) {
+  const c = state.show.gizmo ? gizmoCenter() : null;
+  const z = c ? dot(sub(c, cam.eye), cam.f) : 0;
+  if (!c || z < 0.1) { gizmo = null; return; }
+  const Lw = (GIZMO_PX * z) / cam.F;
+  const at = (a, u, b, v) => project(cam, add(c, mul(add(mul(AXES[a], u), mul(AXES[b], v)), Lw)));
+  const tips = {};
+  for (const k of ['x', 'y', 'z']) tips[k] = project(cam, add(c, mul(AXES[k], Lw)));
+  const planes = {};
+  for (const [name, [a, b]] of Object.entries(PLANES)) {
+    planes[name] = [at(a, 0.22, b, 0.22), at(a, 0.5, b, 0.22), at(a, 0.5, b, 0.5), at(a, 0.22, b, 0.5)];
+  }
+  gizmo = { c, Lw, c0: project(cam, c), tips, planes };
+}
+
+function drawGizmo(tok) {
+  if (!gizmo) return;
+  const active = drag && drag.kind === 'move' ? drag.handle : null;
+  const lit = (name) => hoverHandle === name || active === name;
+  const col = { x: tok('--ax-x'), y: tok('--ax-y'), z: tok('--ax-z') };
+  const warm = tok('--warm');
+  for (const [name, pts] of Object.entries(gizmo.planes)) {
+    const rgb = hexToRgb(lit(name) ? warm : col[PLANES[name][2]]);
+    ctx.fillStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${lit(name) ? 0.75 : 0.4})`;
+    ctx.strokeStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    pts.forEach((q, i) => (i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])));
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+  ctx.lineCap = 'round';
+  ctx.font = '600 12px ui-monospace, Menlo, Consolas, monospace';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const k of ['x', 'y', 'z']) {
+    const tip = gizmo.tips[k], c0 = gizmo.c0;
+    const color = lit(k) ? warm : col[k];
+    const len = Math.hypot(tip[0] - c0[0], tip[1] - c0[1]) || 1;
+    const ux = (tip[0] - c0[0]) / len, uy = (tip[1] - c0[1]) / len;
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(c0[0], c0[1]); ctx.lineTo(tip[0] - ux * 8, tip[1] - uy * 8); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(tip[0], tip[1]);
+    ctx.lineTo(tip[0] - ux * 14 - uy * 5.5, tip[1] - uy * 14 + ux * 5.5);
+    ctx.lineTo(tip[0] - ux * 14 + uy * 5.5, tip[1] - uy * 14 - ux * 5.5);
+    ctx.closePath(); ctx.fill();
+    ctx.fillText(k.toUpperCase(), tip[0] + ux * 13, tip[1] + uy * 13);
+  }
+  ctx.beginPath(); ctx.arc(gizmo.c0[0], gizmo.c0[1], 4, 0, Math.PI * 2);
+  ctx.fillStyle = tok('--curve'); ctx.fill();
+}
+
+function pickHandle(x, y) {
+  if (!gizmo) return null;
+  for (const [name, pts] of Object.entries(gizmo.planes)) {
+    let sign = 0, inside = true;
+    for (let i = 0; i < 4 && inside; i++) {
+      const a = pts[i], b = pts[(i + 1) % 4];
+      const cr = (b[0] - a[0]) * (y - a[1]) - (b[1] - a[1]) * (x - a[0]);
+      if (cr !== 0) { if (sign && Math.sign(cr) !== sign) inside = false; sign = Math.sign(cr); }
+    }
+    if (inside) return name;
+  }
+  let best = null, bd = 9;
+  for (const k of ['x', 'y', 'z']) {
+    const [ax, ay] = gizmo.c0, [bx, by] = gizmo.tips[k];
+    const l2 = (bx - ax) ** 2 + (by - ay) ** 2 || 1;
+    const t = Math.max(0, Math.min(1, ((x - ax) * (bx - ax) + (y - ay) * (by - ay)) / l2));
+    const d = Math.hypot(x - (ax + t * (bx - ax)), y - (ay + t * (by - ay)));
+    if (d < bd) { bd = d; best = k; }
+  }
+  return best;
+}
+
+// 画面上の点を通る視線と、中心を通る平面（法線 n）の交点
+function rayHit(cam, p, n, c) {
+  const a = (p[0] - W / 2) / cam.F, b = -(p[1] - H / 2) / cam.F;
+  const dir = add(cam.f, add(mul(cam.r, a), mul(cam.u, b)));
+  const den = dot(n, dir);
+  if (Math.abs(den) < 1e-6) return null;
+  const t = dot(n, sub(c, cam.eye)) / den;
+  return t > 0 ? add(cam.eye, mul(dir, t)) : null;
+}
+const gizmoInfo = () => gizmo;
 
 function updateReadouts() {
   const c = built.check;
@@ -478,8 +578,12 @@ function applyMove(d0) {
   const z = dot(sub(d0.center, cam.eye), cam.f);
   const k = z / cam.F;
   let d = add(mul(cam.r, dx * k), mul(cam.u, -dy * k));
-  if (state.axis !== 'free') {
-    const ax = AXES[state.axis];
+  const handle = d0.handle || (state.axis !== 'free' ? state.axis : null);
+  if (handle && handle.length === 2) {
+    const hit = rayHit(cam, d0.pos, AXES[PLANES[handle][2]], d0.center);
+    d = hit && d0.hit0 ? sub(hit, d0.hit0) : [0, 0, 0];
+  } else if (handle) {
+    const ax = AXES[handle];
     const p0 = project(cam, d0.center), p1 = project(cam, add(d0.center, ax));
     const sv = [p1[0] - p0[0], p1[1] - p0[1]];
     const l2 = sv[0] ** 2 + sv[1] ** 2;
@@ -510,6 +614,15 @@ cv.addEventListener('pointerdown', (e) => {
     pinch = Math.hypot(a[0] - b[0], a[1] - b[1]); drag = null; return;
   }
   const forceOrbit = e.button === 2 || e.button === 1 || e.altKey;
+  const handle = forceOrbit ? null : pickHandle(p[0], p[1]);
+  if (handle) {
+    drag = beginMove();
+    Object.assign(drag, { last: p, pos: p, handle });
+    if (handle.length === 2) drag.hit0 = rayHit(camera(), p, AXES[PLANES[handle][2]], drag.center);
+    cv.classList.add('dragging');
+    schedule();
+    return;
+  }
   const hit = forceOrbit ? null : pickItem(p[0], p[1]);
   const additive = e.shiftKey || e.ctrlKey || e.metaKey;
   if (hit === null || hit === undefined) {
@@ -524,8 +637,13 @@ cv.addEventListener('pointerdown', (e) => {
   }
   cv.classList.add('dragging');
 });
+cv.addEventListener('pointerleave', () => { if (hoverHandle) { hoverHandle = null; cv.style.cursor = ''; schedule(); } });
 cv.addEventListener('pointermove', (e) => {
-  if (!pointers.has(e.pointerId)) return;
+  if (!pointers.has(e.pointerId)) {
+    const h = pickHandle(...local(e));
+    if (h !== hoverHandle) { hoverHandle = h; cv.style.cursor = h ? 'pointer' : ''; schedule(); }
+    return;
+  }
   const p = local(e);
   pointers.set(e.pointerId, p);
   if (pointers.size === 2) {
@@ -544,6 +662,7 @@ cv.addEventListener('pointermove', (e) => {
     schedule();
   } else if (drag.moved > 3) {
     drag.total = [drag.total[0] + dx, drag.total[1] + dy];
+    drag.pos = p;
     applyMove(drag);
   }
 });
@@ -630,7 +749,7 @@ $('extAmount').addEventListener('input', (e) => { state.extrude = +e.target.valu
 $('tau').addEventListener('input', (e) => { state.tau = +e.target.value; $('tauV').textContent = state.tau.toFixed(2); invalidate(); });
 $('div').addEventListener('input', (e) => { state.N = +e.target.value; $('divV').textContent = state.N; invalidate(); });
 const bindShow = (id, key) => $(id).addEventListener('change', (e) => { state.show[key] = e.target.checked; schedule(); });
-bindShow('sSurface', 'surface'); bindShow('sCurves', 'curves'); bindShow('sCage', 'cage'); bindShow('sCtrl', 'ctrl');
+bindShow('sSurface', 'surface'); bindShow('sCurves', 'curves'); bindShow('sCage', 'cage'); bindShow('sCtrl', 'ctrl'); bindShow('sGizmo', 'gizmo');
 
 function resize() {
   const r = cv.getBoundingClientRect();
@@ -644,4 +763,4 @@ new MutationObserver(schedule).observe(document.documentElement, { attributes: t
 syncUi();
 invalidate();
 
-export { state };
+export { state, gizmoInfo };
