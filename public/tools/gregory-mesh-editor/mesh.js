@@ -48,11 +48,14 @@ export function deleteFaces(model, faceIdxs) {
 }
 
 const MIN_EXTRUDE = 0.02;
+const MAX_EXTRUDE = 100;
 
 export function extrudeFaces(model, faceIdxs, rawDist) {
-  // 頂点が重なると面が潰れて曲面が作れないため、押し出し量に下限を設ける
-  const dist = Number.isFinite(rawDist) && Math.abs(rawDist) >= MIN_EXTRUDE ? rawDist : (rawDist < 0 ? -MIN_EXTRUDE : MIN_EXTRUDE);
-  const sel = new Set(faceIdxs.filter((i) => i >= 0 && i < model.F.length));
+  // 頂点が重なると面が潰れて曲面が作れず、巨大だと座標が溢れるため、押し出し量を範囲に収める
+  const sign = typeof rawDist === 'number' && rawDist < 0 ? -1 : 1;
+  const mag = typeof rawDist === 'number' && Number.isFinite(rawDist) ? Math.min(MAX_EXTRUDE, Math.max(MIN_EXTRUDE, Math.abs(rawDist))) : MIN_EXTRUDE;
+  const dist = sign * mag;
+  const sel = new Set(faceIdxs.filter((i) => Number.isInteger(i) && i >= 0 && i < model.F.length));
   if (!sel.size) return { model: cloneModel(model), faces: [] };
   const { V, F } = model;
   // 頂点ごとに、辺でつながった選択面の扇を別々に押し出す。頂点だけを共有する面で、複製した頂点を共有しない
@@ -179,7 +182,8 @@ export function toggleCreases(model, edgeKeys) {
 
 // x=0 の面について対称な頂点の組を、位置の一致で探す。無ければ -1
 export function mirrorMap(V, eps = 1e-4) {
-  const q = (x) => Math.round(x / eps);
+  // 0 をはさんで丸めが対称になるよう、絶対値で丸める
+  const q = (x) => Math.sign(x) * Math.round(Math.abs(x) / eps);
   const at = new Map();
   V.forEach((p, i) => at.set(q(p[0]) + ',' + q(p[1]) + ',' + q(p[2]), i));
   return V.map((p) => {
