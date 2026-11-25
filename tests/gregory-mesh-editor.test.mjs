@@ -66,6 +66,16 @@ test('折れ目の入れ方によらず、全辺の位置は連続で、滑ら�
   }), { numRuns: 100 });
 });
 
+test('ほぼ平らな面の間の折れ目でも、滑らかな辺の G1 が崩れない（交線が不安定な場合）', () => {
+  const base = M.PRESETS.plane.make();
+  base.V[4] = [-0.15, 0, 0];
+  base.V[3] = [-1, 0, 0.0012];
+  const creases = new Set(['4-5', '4-7']);
+  const { check } = build({ V: base.V, F: base.F, creases }, 8);
+  assert.ok(check.pairs > 0);
+  assert.ok(check.g1 < 0.05, `g1=${check.g1}`);
+});
+
 test('面を1枚押し出すと、面の辺の数だけ側面が増え、頂点がその面の頂点数だけ増える', () => {
   fc.assert(fc.property(presetKey, fc.nat(100), fc.double({ min: 0.1, max: 2, noNaN: true }), (key, pick, d) => {
     const m = M.PRESETS[key].make();
