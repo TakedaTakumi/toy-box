@@ -162,9 +162,9 @@ function newShape(key) {
 // ---- カメラ ----
 function camera() {
   const cp = Math.cos(state.pitch), sp = Math.sin(state.pitch), cy = Math.cos(state.yaw), sy = Math.sin(state.yaw);
-  const eye = [state.dist * cp * cy, state.dist * cp * sy, state.dist * sp];
+  const eye = [state.dist * cp * cy, state.dist * sp, -state.dist * cp * sy];
   const f = norm(mul(eye, -1));
-  const r = norm(cross(f, [0, 0, 1]));
+  const r = norm(cross(f, [0, 1, 0]));
   return { eye, f, r, u: cross(r, f), F: Math.min(W, H) * 1.55 };
 }
 function project(cam, p) {
