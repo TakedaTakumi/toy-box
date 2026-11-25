@@ -214,7 +214,8 @@ export function validateModel(model) {
 }
 
 const cubeV = [[-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1], [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]];
-const make = (V, F) => ({ V, F, creases: new Set() });
+// 高さを z で書いた座標を、Y-up（x, z, -y）に直す。回転なので、右手系も面の向きも変わらない
+const make = (V, F) => ({ V: V.map(([x, y, z]) => [x, z, 0 - y]), F, creases: new Set() });
 
 export const PRESETS = {
   cube: { name: '立方体', make: () => make(cubeV.map((v) => v.slice()), [[4, 5, 6, 7], [3, 2, 1, 0], [0, 1, 5, 4], [2, 3, 7, 6], [1, 2, 6, 5], [3, 0, 4, 7]]) },
