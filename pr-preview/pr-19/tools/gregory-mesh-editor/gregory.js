@@ -201,7 +201,10 @@ function buildModel(V, F, opts) {
     const nbrs = list.map(({ fi, k }) => { const f = F[fi], m = f.length; return [f[(k + 1) % m], f[(k + m - 1) % m]]; });
     for (let i = 0; i < list.length; i++) {
       for (let j = i + 1; j < list.length; j++) {
-        const shared = nbrs[i].some((w) => nbrs[j].includes(w) && !creases.has(ekey(v, w)));
+        // 折れ目でも、両側の面がほぼ同じ平面なら、交線の向きが不安定なので折れ目として扱わない
+        const flatI = norm(cornerWeighted(list[i].fi, list[i].k)), flatJ = norm(cornerWeighted(list[j].fi, list[j].k));
+        const coplanar = dot(flatI, flatJ) > 0 && len(cross(flatI, flatJ)) < 0.05;
+        const shared = nbrs[i].some((w) => nbrs[j].includes(w) && (!creases.has(ekey(v, w)) || coplanar));
         if (shared) parent[find(i)] = find(j);
       }
     }

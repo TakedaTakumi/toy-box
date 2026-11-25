@@ -10,7 +10,7 @@ const AXES = { x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] };
 const state = {
   model: M.PRESETS.cube.make(),
   mode: 'v', sel: new Set(), primary: new Set(),
-  mirror: false, axis: 'free', tau: 1, N: 8, extrude: 0.4,
+  mirror: false, axis: 'free', shading: 'smooth', tau: 1, N: 8, extrude: 0.4,
   show: { surface: true, curves: true, cage: true, ctrl: false },
   yaw: 0.75, pitch: 0.45, dist: 8.6,
 };
@@ -180,6 +180,85 @@ const isDark = () => {
 };
 const hexToRgb = (h) => { const s = h.replace('#', ''); return [0, 2, 4].map((i) => parseInt(s.slice(i, i + 2), 16)); };
 
+// ---- 曲面のラスタライズ ----
+// 2倍の解像度で描いて縮小し、輪郭を滑らかにする
+const SS = 2;
+const surfCanvas = document.createElement('canvas');
+const surfCtx = surfCanvas.getContext('2d');
+let surfImg = null, zbuf = null;
+const LIGHT = norm([-0.4, 0.6, -0.7]);
+const HALF = norm([LIGHT[0], LIGHT[1], LIGHT[2] - 1]);
+
+function drawSurface(s) {
+  const w = Math.round(W * SS), h = Math.round(H * SS);
+  if (surfCanvas.width !== w || surfCanvas.height !== h || !surfImg) {
+    surfCanvas.width = w; surfCanvas.height = h;
+    surfImg = surfCtx.createImageData(w, h);
+    zbuf = new Float32Array(w * h);
+  }
+  const px = surfImg.data;
+  px.fill(0); zbuf.fill(0);
+  const flat = state.shading === 'flat';
+  const { cam, pos, tris, base, warm } = s;
+  for (let t = 0; t < tris.length; t++) {
+    const [a, b, c] = tris[t];
+    if ((s.vnz[a] + s.vnz[b] + s.vnz[c]) / 3 > 0.06) continue;
+    const x0 = s.sx[a] * SS, y0 = s.sy[a] * SS, x1 = s.sx[b] * SS, y1 = s.sy[b] * SS, x2 = s.sx[c] * SS, y2 = s.sy[c] * SS;
+    if (!Number.isFinite(x0 + y0 + x1 + y1 + x2 + y2)) continue;
+    const area = (x1 - x0) * (y2 - y0) - (y1 - y0) * (x2 - x0);
+    if (Math.abs(area) < 1e-9) continue;
+    // 奥行きの逆数は画面上で線形に補間できる。法線も逆数を掛けて補間し、遠近を正しく反映する
+    const i0 = 1 / s.sz[a], i1 = 1 / s.sz[b], i2 = 1 / s.sz[c];
+    const nx0 = s.vnx[a] * i0, nx1 = s.vnx[b] * i1, nx2 = s.vnx[c] * i2;
+    const ny0 = s.vny[a] * i0, ny1 = s.vny[b] * i1, ny2 = s.vny[c] * i2;
+    const nz0 = s.vnz[a] * i0, nz1 = s.vnz[b] * i1, nz2 = s.vnz[c] * i2;
+    let flatShade = 0, flatSpec = 0;
+    if (flat) {
+      let fn = norm(cross(sub(pos[b], pos[a]), sub(pos[c], pos[a])));
+      if (fn[0] === 0 && fn[1] === 0 && fn[2] === 0) fn = [0, 0, -1];
+      const l = lighting(dot(fn, cam.r), dot(fn, cam.u), dot(fn, cam.f));
+      flatShade = l[0]; flatSpec = l[1];
+    }
+    const tint = s.faceSel.has(s.triFace[t]);
+    const minX = Math.max(0, Math.floor(Math.min(x0, x1, x2))), maxX = Math.min(w - 1, Math.ceil(Math.max(x0, x1, x2)));
+    const minY = Math.max(0, Math.floor(Math.min(y0, y1, y2))), maxY = Math.min(h - 1, Math.ceil(Math.max(y0, y1, y2)));
+    for (let y = minY; y <= maxY; y++) {
+      const py = y + 0.5;
+      for (let x = minX; x <= maxX; x++) {
+        const pxc = x + 0.5;
+        const w1 = ((pxc - x0) * (y2 - y0) - (py - y0) * (x2 - x0)) / area;
+        const w2 = ((x1 - x0) * (py - y0) - (y1 - y0) * (pxc - x0)) / area;
+        const w0 = 1 - w1 - w2;
+        if (w0 < -1e-6 || w1 < -1e-6 || w2 < -1e-6) continue;
+        const iz = w0 * i0 + w1 * i1 + w2 * i2;
+        const idx = y * w + x;
+        if (iz <= zbuf[idx]) continue;
+        zbuf[idx] = iz;
+        let shade = flatShade, spec = flatSpec;
+        if (!flat) {
+          const nx = (w0 * nx0 + w1 * nx1 + w2 * nx2) / iz;
+          const ny = (w0 * ny0 + w1 * ny1 + w2 * ny2) / iz;
+          const nzz = (w0 * nz0 + w1 * nz1 + w2 * nz2) / iz;
+          const len = Math.hypot(nx, ny, nzz);
+          const l = len > 1e-9 ? lighting(nx / len, ny / len, nzz / len) : [0.3, 0];
+          shade = l[0]; spec = l[1];
+        }
+        let r = base[0] * shade + 255 * spec, g = base[1] * shade + 255 * spec, bl = base[2] * shade + 255 * spec;
+        if (tint) { r = r * 0.45 + warm[0] * 0.55; g = g * 0.45 + warm[1] * 0.55; bl = bl * 0.45 + warm[2] * 0.55; }
+        const o = idx * 4;
+        px[o] = r > 255 ? 255 : r; px[o + 1] = g > 255 ? 255 : g; px[o + 2] = bl > 255 ? 255 : bl; px[o + 3] = 255;
+      }
+    }
+  }
+  surfCtx.putImageData(surfImg, 0, 0);
+}
+
+function lighting(nx, ny, nzz) {
+  const d = nx * LIGHT[0] + ny * LIGHT[1] + nzz * LIGHT[2];
+  const hh = nx * HALF[0] + ny * HALF[1] + nzz * HALF[2];
+  return [0.3 + 0.1 * ny + 0.68 * Math.max(0, d), 0.22 * Math.pow(Math.max(0, hh), 28)];
+}
+
 // ---- 描画 ----
 function draw() {
   raf = 0;
@@ -217,40 +296,19 @@ function draw() {
 
   const n = pos.length;
   const sx = new Float32Array(n), sy = new Float32Array(n), sz = new Float32Array(n);
-  const nz = new Float32Array(n), shade = new Float32Array(n), spec = new Float32Array(n);
-  const Lv = norm([-0.4, 0.6, -0.7]);
-  const Hv = norm([Lv[0], Lv[1], Lv[2] - 1]);
+  const nz = new Float32Array(n), vnx = new Float32Array(n), vny = new Float32Array(n);
   for (let i = 0; i < n; i++) {
     const p = project(cam, pos[i]);
     sx[i] = p[0]; sy[i] = p[1]; sz[i] = p[2];
-    const nv = [dot(nrm[i], cam.r), dot(nrm[i], cam.u), dot(nrm[i], cam.f)];
-    nz[i] = nv[2];
-    shade[i] = 0.3 + 0.1 * nv[1] + 0.68 * Math.max(0, dot(nv, Lv));
-    spec[i] = 0.22 * Math.pow(Math.max(0, dot(nv, Hv)), 28);
+    vnx[i] = dot(nrm[i], cam.r); vny[i] = dot(nrm[i], cam.u); nz[i] = dot(nrm[i], cam.f);
   }
   view = { sx, sy, sz, nz, tris, triFace };
   const faceSel = state.mode === 'f' ? state.sel : new Set();
-
   if (state.show.surface) {
-    const order = [];
-    for (let t = 0; t < tris.length; t++) {
-      const [a, b, c] = tris[t];
-      if ((nz[a] + nz[b] + nz[c]) / 3 > 0.06) continue;
-      if (!Number.isFinite(sx[a] + sx[b] + sx[c] + sy[a] + sy[b] + sy[c])) continue;
-      order.push([t, sz[a] + sz[b] + sz[c]]);
-    }
-    order.sort((p, q) => q[1] - p[1]);
-    ctx.lineWidth = 0.8; ctx.lineJoin = 'round';
-    for (const [t] of order) {
-      const [a, b, c] = tris[t];
-      const s = (shade[a] + shade[b] + shade[c]) / 3, sp = (spec[a] + spec[b] + spec[c]) / 3;
-      let col = [base[0] * s + 255 * sp, base[1] * s + 255 * sp, base[2] * s + 255 * sp];
-      if (faceSel.has(triFace[t])) col = col.map((x, i) => x * 0.45 + warm[i] * 0.55);
-      const css2 = `rgb(${Math.min(255, col[0]) | 0},${Math.min(255, col[1]) | 0},${Math.min(255, col[2]) | 0})`;
-      ctx.fillStyle = css2; ctx.strokeStyle = css2;
-      ctx.beginPath(); ctx.moveTo(sx[a], sy[a]); ctx.lineTo(sx[b], sy[b]); ctx.lineTo(sx[c], sy[c]); ctx.closePath();
-      ctx.fill(); ctx.stroke();
-    }
+    drawSurface({ cam, pos, tris, triFace, sx, sy, sz, vnx, vny, vnz: nz, faceSel, base, warm });
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(surfCanvas, 0, 0, W, H);
   }
 
   const { V } = state.model;
@@ -355,6 +413,7 @@ function updateReadouts() {
 function syncUi() {
   document.querySelectorAll('#modes button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === state.mode)));
   document.querySelectorAll('#axes button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.axis === state.axis)));
+  document.querySelectorAll('#shading button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.shading === state.shading)));
   $('undo').disabled = !undoStack.length;
   $('redo').disabled = !redoStack.length;
   const n = state.sel.size;
@@ -528,6 +587,7 @@ window.addEventListener('keydown', (e) => {
   else if (k === 'l') opLoopCut();
   else if (k === 'c') opCrease();
   else if (k === 'm') setMirror(!state.mirror);
+  else if (k === 's') setShading(state.shading === 'smooth' ? 'flat' : 'smooth');
   else if (k === 'delete' || k === 'backspace') { e.preventDefault(); opDelete(); }
   else if (k === 'escape') clearSel();
   else if (k === 'x' || k === 'y' || k === 'z') setAxis(state.axis === k ? 'free' : k);
@@ -544,6 +604,7 @@ function setMirror(on) {
   syncUi(); schedule();
 }
 function setAxis(a) { state.axis = a; syncUi(); }
+function setShading(v) { state.shading = v; syncUi(); schedule(); }
 
 // ---- 画面の部品 ----
 const presets = $('presets');
@@ -555,6 +616,7 @@ Object.entries(M.PRESETS).forEach(([key, p]) => {
 });
 document.querySelectorAll('#modes button').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
 document.querySelectorAll('#axes button').forEach((b) => b.addEventListener('click', () => setAxis(b.dataset.axis)));
+document.querySelectorAll('#shading button').forEach((b) => b.addEventListener('click', () => setShading(b.dataset.shading)));
 $('selAll').addEventListener('click', selectAll);
 $('selNone').addEventListener('click', clearSel);
 $('extrude').addEventListener('click', opExtrude);
