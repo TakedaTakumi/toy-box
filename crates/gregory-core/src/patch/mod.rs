@@ -21,6 +21,8 @@ pub enum PatchKind {
     Tri,
 }
 
+// ほとんどのパッチは四角形なので、Box化しても節約は小さく、四角形ごとのヒープ確保が増えるだけ
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, PartialEq)]
 pub enum Patch {
     Quad(QuadPatch),

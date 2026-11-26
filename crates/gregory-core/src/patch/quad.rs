@@ -21,7 +21,12 @@ impl QuadPatch {
             b[3 - m][3] = ed[2].e[m];
             b[0][3 - m] = ed[3].e[m];
         }
-        let q = ed.map(|d| [add(d.e[1], mul(d.c[1], 1.0 / 3.0)), add(d.e[2], mul(d.c[2], 1.0 / 3.0))]);
+        let q = ed.map(|d| {
+            [
+                add(d.e[1], mul(d.c[1], 1.0 / 3.0)),
+                add(d.e[2], mul(d.c[2], 1.0 / 3.0)),
+            ]
+        });
         Self { ed, q, b }
     }
 

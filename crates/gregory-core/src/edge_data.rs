@@ -48,7 +48,10 @@ impl CrossTangentField for G1Field {
         let s = 1.0 - t;
         let c = add(mul(self.c0, s), mul(self.c1, t));
         let tangent = bezier3d(&self.e, t);
-        add(mul(c, s * self.a0 + t * self.a1), mul(tangent, s * self.b0 + t * self.b1))
+        add(
+            mul(c, s * self.a0 + t * self.a1),
+            mul(tangent, s * self.b0 + t * self.b1),
+        )
     }
 }
 
@@ -90,7 +93,12 @@ pub(crate) fn edge_data(
     let k = at.k;
     let nx = corner[at.fi][k];
     let ny = corner[at.fi][(k + 1) % m];
-    let (x, y, w, z) = (face[k], face[(k + 1) % m], face[(k + m - 1) % m], face[(k + 2) % m]);
+    let (x, y, w, z) = (
+        face[k],
+        face[(k + 1) % m],
+        face[(k + m - 1) % m],
+        face[(k + 2) % m],
+    );
     let e = curves.curve(x, y);
     let ax = mul(sub(curves.curve(x, w)[1], cage.v[x]), 3.0);
     let ay = mul(sub(curves.curve(y, z)[1], cage.v[y]), 3.0);

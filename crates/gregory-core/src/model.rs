@@ -40,7 +40,12 @@ pub struct BuildOptions {
 
 impl Default for BuildOptions {
     fn default() -> Self {
-        Self { tau: 1.0, mode: Mode::G1, n: 8, creases: HashSet::new() }
+        Self {
+            tau: 1.0,
+            mode: Mode::G1,
+            n: 8,
+            creases: HashSet::new(),
+        }
     }
 }
 
@@ -62,7 +67,11 @@ pub struct Model {
     pub count: FaceCount,
 }
 
-pub fn build_model(v: &[Vec3], f: &[Vec<usize>], opts: &BuildOptions) -> Result<Model, GregoryError> {
+pub fn build_model(
+    v: &[Vec3],
+    f: &[Vec<usize>],
+    opts: &BuildOptions,
+) -> Result<Model, GregoryError> {
     validate(v, f)?;
     let cage = Cage::new(v, f);
     let edge_map = EdgeMap::build(f);
@@ -96,18 +105,33 @@ pub fn build_model(v: &[Vec3], f: &[Vec<usize>], opts: &BuildOptions) -> Result<
         q: f.iter().filter(|face| face.len() == 4).count(),
         t: f.iter().filter(|face| face.len() == 3).count(),
     };
-    Ok(Model { nrm, patches, edges, mesh, check, count })
+    Ok(Model {
+        nrm,
+        patches,
+        edges,
+        mesh,
+        check,
+        count,
+    })
 }
 
 /// JS 版が必ず例外を投げる入力を、計算の前に弾く。
 fn validate(v: &[Vec3], f: &[Vec<usize>]) -> Result<(), GregoryError> {
     for (fi, face) in f.iter().enumerate() {
         if let Some((k, &vertex)) = face.iter().enumerate().find(|&(_, &x)| x >= v.len()) {
-            return Err(GregoryError::VertexOutOfRange { face: fi, corner: k, vertex, vertex_count: v.len() });
+            return Err(GregoryError::VertexOutOfRange {
+                face: fi,
+                corner: k,
+                vertex,
+                vertex_count: v.len(),
+            });
         }
     }
     match f.iter().position(|face| face.len() < 3) {
-        Some(fi) => Err(GregoryError::TooFewCorners { face: fi, corners: f[fi].len() }),
+        Some(fi) => Err(GregoryError::TooFewCorners {
+            face: fi,
+            corners: f[fi].len(),
+        }),
         None => Ok(()),
     }
 }
@@ -118,7 +142,9 @@ fn make_patch(fi: usize, ed: Vec<EdgeData>) -> Result<Patch, GregoryError> {
         Ok(quad) => Ok(Patch::Quad(QuadPatch::new(quad))),
         Err(ed) => {
             let corners = ed.len();
-            TriPatch::new(ed).map(Patch::Tri).ok_or(GregoryError::TooFewCorners { face: fi, corners })
+            TriPatch::new(ed)
+                .map(Patch::Tri)
+                .ok_or(GregoryError::TooFewCorners { face: fi, corners })
         }
     }
 }

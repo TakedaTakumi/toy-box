@@ -31,6 +31,10 @@ jobs:
           rustup toolchain install
           rustup show
       - if: github.event.action != 'closed'
+        run: cargo fmt --all -- --check
+      - if: github.event.action != 'closed'
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - if: github.event.action != 'closed'
         run: cargo test --workspace --locked
       - uses: actions/setup-node@v4
         if: github.event.action != 'closed'

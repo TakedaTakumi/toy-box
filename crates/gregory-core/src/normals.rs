@@ -20,7 +20,11 @@ pub(crate) fn vertex_normals(cage: Cage<'_>) -> Vec<Vec3> {
 
 /// `corner[fi][k]` が面 `fi` の角 `k` の法線になる表を返す。
 pub(crate) fn corner_normals(cage: Cage<'_>, creases: &HashSet<EdgeKey>) -> Vec<Vec<Vec3>> {
-    let mut corner: Vec<Vec<Vec3>> = cage.f.iter().map(|face| vec![[0.0; 3]; face.len()]).collect();
+    let mut corner: Vec<Vec<Vec3>> = cage
+        .f
+        .iter()
+        .map(|face| vec![[0.0; 3]; face.len()])
+        .collect();
     let mut incident: Vec<Vec<FaceCorner>> = vec![Vec::new(); cage.v.len()];
     for (fi, face) in cage.f.iter().enumerate() {
         for (k, &v) in face.iter().enumerate() {
@@ -38,8 +42,12 @@ pub(crate) fn corner_normals(cage: Cage<'_>, creases: &HashSet<EdgeKey>) -> Vec<
             }
         }
         for (r, sum) in sums {
-            let members: Vec<FaceCorner> =
-                list.iter().zip(&roots).filter(|&(_, &root)| root == r).map(|(&c, _)| c).collect();
+            let members: Vec<FaceCorner> = list
+                .iter()
+                .zip(&roots)
+                .filter(|&(_, &root)| root == r)
+                .map(|(&c, _)| c)
+                .collect();
             let n = choose_normal(cage, sum, &members);
             for c in &members {
                 corner[c.fi][c.k] = n;
@@ -50,7 +58,12 @@ pub(crate) fn corner_normals(cage: Cage<'_>, creases: &HashSet<EdgeKey>) -> Vec<
 }
 
 /// 頂点 `v` を囲む角を、折れ目でない辺でつながるものどうしにまとめ、各角の群の代表を返す。
-fn smooth_groups(cage: Cage<'_>, v: usize, list: &[FaceCorner], creases: &HashSet<EdgeKey>) -> Vec<usize> {
+fn smooth_groups(
+    cage: Cage<'_>,
+    v: usize,
+    list: &[FaceCorner],
+    creases: &HashSet<EdgeKey>,
+) -> Vec<usize> {
     let mut uf = UnionFind::new(list.len());
     let nbrs: Vec<[usize; 2]> = list.iter().map(|&c| [cage.next(c), cage.prev(c)]).collect();
     for i in 0..list.len() {
@@ -59,9 +72,9 @@ fn smooth_groups(cage: Cage<'_>, v: usize, list: &[FaceCorner], creases: &HashSe
             let flat_i = norm(cage.corner_weighted(list[i]));
             let flat_j = norm(cage.corner_weighted(list[j]));
             let coplanar = dot(flat_i, flat_j) > 0.0 && len(cross(flat_i, flat_j)) < 0.05;
-            let shared = nbrs[i]
-                .iter()
-                .any(|&w| nbrs[j].contains(&w) && (!creases.contains(&EdgeKey::new(v, w)) || coplanar));
+            let shared = nbrs[i].iter().any(|&w| {
+                nbrs[j].contains(&w) && (!creases.contains(&EdgeKey::new(v, w)) || coplanar)
+            });
             if shared {
                 uf.union(i, j);
             }

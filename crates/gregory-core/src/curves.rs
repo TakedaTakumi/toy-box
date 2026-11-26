@@ -24,7 +24,14 @@ impl<'a> EdgeCurves<'a> {
         creases: &'a HashSet<EdgeKey>,
         tau: f64,
     ) -> Self {
-        Self { cage, edges, corner, creases, tau, cache: HashMap::new() }
+        Self {
+            cage,
+            edges,
+            corner,
+            creases,
+            tau,
+            cache: HashMap::new(),
+        }
     }
 
     /// `x` から `y` への曲線。逆向きの曲線も同時に記録する（`x == y` では、2回目以降は逆向きが返る）。
@@ -60,17 +67,31 @@ impl<'a> EdgeCurves<'a> {
             let line = cross(n1, n2);
             if len(line) > 1e-3 {
                 let dir = norm(line);
-                return mul(if dot(dir, d) < 0.0 { mul(dir, -1.0) } else { dir }, l * self.tau);
+                return mul(
+                    if dot(dir, d) < 0.0 {
+                        mul(dir, -1.0)
+                    } else {
+                        dir
+                    },
+                    l * self.tau,
+                );
             }
         }
         let pr = sub(d, mul(n1, dot(d, n1)));
         let pl = len(pr);
-        if pl < 1e-9 { mul(d, self.tau) } else { mul(pr, (l * self.tau) / pl) }
+        if pl < 1e-9 {
+            mul(d, self.tau)
+        } else {
+            mul(pr, (l * self.tau) / pl)
+        }
     }
 
     /// 面の中で最初に現れる頂点 `v` の角の法線（JS の `indexOf` と同じく、重複した頂点では先頭を使う）。
     fn corner_at(&self, at: FaceCorner, v: usize) -> Vec3 {
-        let k = self.cage.f[at.fi].iter().position(|&x| x == v).unwrap_or(at.k);
+        let k = self.cage.f[at.fi]
+            .iter()
+            .position(|&x| x == v)
+            .unwrap_or(at.k);
         self.corner[at.fi][k]
     }
 }

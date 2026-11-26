@@ -36,7 +36,15 @@ impl TriPatch {
             c[0][4 - m] = fe[1][m];
             c[m][0] = fe[2][m];
         }
-        let q = ed.iter().map(|d| [add(d.e[1], mul(d.c[1], 0.25)), add(d.e[2], mul(d.c[2], 0.25))]).collect();
+        let q = ed
+            .iter()
+            .map(|d| {
+                [
+                    add(d.e[1], mul(d.c[1], 0.25)),
+                    add(d.e[2], mul(d.c[2], 0.25)),
+                ]
+            })
+            .collect();
         Some(Self { ed, q, c })
     }
 
@@ -57,8 +65,8 @@ impl TriPatch {
         let p1 = blend(b0, q[0][1], b2, q[1][0]);
         let p2 = blend(b1, q[1][1], b0, q[2][0]);
         let mut r = [0.0; 3];
-        for i in 0..=4_usize {
-            for j in 0..=(4 - i) {
+        for (i, &fi) in FACT.iter().enumerate().take(5) {
+            for (j, &fj) in FACT.iter().enumerate().take(5 - i) {
                 let k = 4 - i - j;
                 let p = match (i, j) {
                     (2, 1) => p0,
@@ -66,7 +74,7 @@ impl TriPatch {
                     (1, 1) => p2,
                     _ => self.c[i][j],
                 };
-                let w = (FACT[4] / (FACT[i] * FACT[j] * FACT[k]))
+                let w = (FACT[4] / (fi * fj * FACT[k]))
                     * b0.powf(i as f64)
                     * b1.powf(j as f64)
                     * b2.powf(k as f64);

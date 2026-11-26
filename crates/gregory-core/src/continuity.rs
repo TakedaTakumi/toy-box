@@ -35,9 +35,15 @@ fn sample_edge(patches: &[Patch], at: FaceCorner, t: f64) -> Result<EdgeSample, 
     let h = 1e-6;
     let [p0, p1] = patch
         .edge_point(at.k, t, h)
-        .ok_or(GregoryError::EdgeOutsidePatch { face: at.fi, edge: at.k })?;
+        .ok_or(GregoryError::EdgeOutsidePatch {
+            face: at.fi,
+            edge: at.k,
+        })?;
     let tangent = bezier3d(&patch.ed()[at.k].e, t);
-    Ok(EdgeSample { p: p0, n: norm(cross(tangent, mul(sub(p1, p0), 1.0 / h))) })
+    Ok(EdgeSample {
+        p: p0,
+        n: norm(cross(tangent, mul(sub(p1, p0), 1.0 / h))),
+    })
 }
 
 pub(crate) fn check_continuity(
@@ -45,7 +51,13 @@ pub(crate) fn check_continuity(
     patches: &[Patch],
     edges: &[Edge],
 ) -> Result<ContinuityCheck, GregoryError> {
-    let mut check = ContinuityCheck { g0: 0.0, g1: 0.0, pairs: 0, creased: 0, samples: Vec::new() };
+    let mut check = ContinuityCheck {
+        g0: 0.0,
+        g1: 0.0,
+        pairs: 0,
+        creased: 0,
+        samples: Vec::new(),
+    };
     for e in edges {
         let &[fa, fb] = e.faces.as_slice() else {
             continue;
@@ -64,10 +76,15 @@ pub(crate) fn check_continuity(
             if e.crease {
                 continue;
             }
-            let ang = js_max(-1.0, js_min(1.0, dot(a.n, b.n))).acos() * (180.0 / std::f64::consts::PI);
+            let ang =
+                js_max(-1.0, js_min(1.0, dot(a.n, b.n))).acos() * (180.0 / std::f64::consts::PI);
             check.g1 = js_max(check.g1, ang);
             if i == 3 || i == 5 || i == 7 {
-                check.samples.push(Sample { p: a.p, na: a.n, nb: b.n });
+                check.samples.push(Sample {
+                    p: a.p,
+                    na: a.n,
+                    nb: b.n,
+                });
             }
         }
     }

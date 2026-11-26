@@ -14,7 +14,10 @@ pub struct EdgeKey {
 
 impl EdgeKey {
     pub fn new(x: usize, y: usize) -> Self {
-        Self { a: x.min(y), b: x.max(y) }
+        Self {
+            a: x.min(y),
+            b: x.max(y),
+        }
     }
 
     pub fn a(self) -> usize {
@@ -70,7 +73,11 @@ impl EdgeMap {
             for k in 0..m {
                 let key = EdgeKey::new(face[k], face[(k + 1) % m]);
                 let slot = *index.entry(key).or_insert_with(|| {
-                    entries.push(EdgeEntry { a: key.a, b: key.b, faces: Vec::new() });
+                    entries.push(EdgeEntry {
+                        a: key.a,
+                        b: key.b,
+                        faces: Vec::new(),
+                    });
                     entries.len() - 1
                 });
                 entries[slot].faces.push(FaceCorner { fi, k });
@@ -80,7 +87,9 @@ impl EdgeMap {
     }
 
     pub fn get(&self, x: usize, y: usize) -> Option<&EdgeEntry> {
-        self.index.get(&EdgeKey::new(x, y)).map(|&i| &self.entries[i])
+        self.index
+            .get(&EdgeKey::new(x, y))
+            .map(|&i| &self.entries[i])
     }
 
     pub fn entries(&self) -> &[EdgeEntry] {
