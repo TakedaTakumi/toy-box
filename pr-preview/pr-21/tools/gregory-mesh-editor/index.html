@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>グレゴリーメッシュエディタ試作</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+JP:wght@400;500;600&display=swap">
+<style>
+/* 左に3Dステージ、右に操作パネル。狭い画面ではステージの下にパネルを積む */
+:root {
+  color-scheme: light;
+  --bg: #eceff2; --panel: #fafbfc; --ink: #17212b; --muted: #566472; --line: #d2d9e0;
+  --stage: #e2e8ed; --curve: #0a2538; --crease: #8a3a12; --accent: #0b6e80; --accent-soft: #d5ebef;
+  --warm: #d2551f; --ok: #17784b; --ok-bg: #dcf2e6; --bad: #b3261e; --bad-bg: #fbe2df;
+  --plane: rgba(11, 110, 128, 0.10); --ax-x: #c4524a; --ax-y: #4a9a62; --ax-z: #4a72c4;
+  --font-ui: 'IBM Plex Sans JP', 'Hiragino Sans', 'Yu Gothic', 'Noto Sans JP', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0e1418; --panel: #151d23; --ink: #e5ecf2; --muted: #92a0ac; --line: #28333c;
+    --stage: #1a242b; --curve: #eef5f9; --crease: #ffb48a; --accent: #4cc2d6; --accent-soft: #17323a; --warm: #ff8c5e;
+    --ok: #5ad69b; --ok-bg: #12301f; --bad: #ff7d75; --bad-bg: #3a1a18;
+    --plane: rgba(76, 194, 214, 0.12); --ax-x: #d9736b; --ax-y: #6fbd84; --ax-z: #7096e0;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0e1418; --panel: #151d23; --ink: #e5ecf2; --muted: #92a0ac; --line: #28333c;
+  --stage: #1a242b; --curve: #eef5f9; --crease: #ffb48a; --accent: #4cc2d6; --accent-soft: #17323a; --warm: #ff8c5e;
+  --ok: #5ad69b; --ok-bg: #12301f; --bad: #ff7d75; --bad-bg: #3a1a18;
+  --plane: rgba(76, 194, 214, 0.12); --ax-x: #d9736b; --ax-y: #6fbd84; --ax-z: #7096e0;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-ui); font-size: 14px; line-height: 1.6;
+  padding-block: calc(20px + env(safe-area-inset-top, 0px)) calc(20px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.app { max-width: 1280px; margin: 0 auto; display: grid; gap: 16px; }
+h1 { margin: 0; font-size: 22px; font-weight: 600; text-wrap: balance; }
+.lead { margin: 4px 0 0; color: var(--muted); max-width: 72ch; }
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; align-items: start; }
+.stage { position: relative; height: clamp(400px, 74vh, 700px); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--stage); }
+canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+canvas.dragging { cursor: grabbing; }
+.hint { position: absolute; left: 10px; bottom: 8px; right: 96px; font-size: 12px; color: var(--muted); pointer-events: none; }
+.toast { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); max-width: calc(100% - 24px); padding: 6px 14px; border-radius: 4px; background: var(--ink); color: var(--bg); font-size: 13px; pointer-events: none; }
+.zoom { position: absolute; right: 10px; bottom: 10px; display: flex; gap: 6px; }
+.zoom button { width: 34px; height: 34px; padding: 0; font-size: 18px; line-height: 1; }
+.panel { display: grid; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); min-width: 0; }
+.sec { padding: 12px 16px; border-top: 1px solid var(--line); display: grid; gap: 8px; }
+.sec:first-child { border-top: 0; }
+.sec h2 { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; color: var(--muted); }
+button { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 5px 10px; cursor: pointer; }
+button:hover:not(:disabled) { border-color: var(--accent); }
+button:disabled { opacity: 0.45; cursor: default; }
+button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); font-weight: 600; }
+kbd { font-family: var(--font-mono); font-size: 11px; padding: 0 4px; border: 1px solid var(--line); border-radius: 3px; color: var(--muted); }
+.seg { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.seg.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.seg.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.row { display: grid; grid-template-columns: 76px minmax(0, 1fr) 44px; align-items: center; gap: 8px; }
+.row output { font-family: var(--font-mono); text-align: right; font-size: 13px; }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+.checks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 10px; }
+.checks label, .inline { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+input[type="checkbox"] { accent-color: var(--accent); }
+.meter { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 2px 10px; margin: 0; }
+.meter dt { color: var(--muted); }
+.meter dd { margin: 0; font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; }
+.pill { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; margin-left: 6px; font-family: var(--font-ui); }
+.pill.ok { background: var(--ok-bg); color: var(--ok); }
+.pill.bad { background: var(--bad-bg); color: var(--bad); }
+.note { font-size: 12.5px; color: var(--muted); }
+.warn { font-size: 12.5px; color: var(--bad); }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 13px; }
+@media (max-width: 960px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .stage { height: min(64vh, 500px); }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>グレゴリーメッシュエディタ試作</h1>
+    <p class="lead">ケージ（点・辺・面）を編集すると、辺のベジェ曲線が自動で決まり、四角形・三角形のグレゴリーパッチが G1 連続で貼られます。メタセコイア風の編集操作を確かめる最小版です。</p>
+  </header>
+  <main class="layout">
+    <section class="stage" aria-label="3Dビュー">
+      <canvas id="cv" tabindex="0" aria-label="ケージ編集のビュー。ドラッグで視点回転、要素をクリックで選択、選択した要素をドラッグで移動"></canvas>
+      <div class="toast" id="toast" role="status" hidden></div>
+      <div class="hint">空所のドラッグで視点回転 / 要素をクリックで選択、ハンドルかドラッグで移動 / ホイールで拡大縮小</div>
+      <div class="zoom"><button id="zin" aria-label="拡大">＋</button><button id="zout" aria-label="縮小">－</button></div>
+    </section>
+    <aside class="panel">
+      <div class="sec">
+        <h2>新しい形状から始める</h2>
+        <div class="seg" id="presets" role="group" aria-label="形状プリセット"></div>
+      </div>
+      <div class="sec">
+        <h2>選択</h2>
+        <div class="seg three" id="modes" role="group" aria-label="選択モード">
+          <button data-mode="v" aria-pressed="true">点 <kbd>1</kbd></button>
+          <button data-mode="e" aria-pressed="false">辺 <kbd>2</kbd></button>
+          <button data-mode="f" aria-pressed="false">面 <kbd>3</kbd></button>
+        </div>
+        <div class="seg two"><button id="selAll">すべて選択</button><button id="selNone">選択解除 <kbd>Esc</kbd></button></div>
+        <div class="mono" id="selInfo"></div>
+        <div class="note">Shift（または Ctrl）を押しながらクリックで追加・解除できます。</div>
+      </div>
+      <div class="sec">
+        <h2>編集</h2>
+        <div class="seg two"><button id="undo" disabled>元に戻す</button><button id="redo" disabled>やり直し</button></div>
+        <div class="seg two">
+          <button id="extrude">押し出し <kbd>E</kbd></button>
+          <button id="loopcut">ループ分割 <kbd>L</kbd></button>
+          <button id="del">削除 <kbd>Del</kbd></button>
+          <button id="crease">折れ目の切り替え <kbd>C</kbd></button>
+        </div>
+        <div class="row"><label for="extAmount">押し出し量</label><input id="extAmount" type="range" min="0.1" max="1.2" step="0.05" value="0.4"><output id="extAmountV">0.40</output></div>
+        <div class="note">押し出しは面モード、ループ分割と折れ目は辺モードで使います。</div>
+      </div>
+      <div class="sec">
+        <h2>移動</h2>
+        <div class="seg" id="axes" role="group" aria-label="移動の軸">
+          <button data-axis="free" aria-pressed="true">自由</button>
+          <button data-axis="x" aria-pressed="false">X</button>
+          <button data-axis="y" aria-pressed="false">Y</button>
+          <button data-axis="z" aria-pressed="false">Z</button>
+        </div>
+        <label class="inline"><input type="checkbox" id="mirror">ミラー編集（x=0 で左右対称） <kbd>M</kbd></label>
+      </div>
+      <div class="sec">
+        <h2>表示</h2>
+        <div class="seg two" id="shading" role="group" aria-label="シェーディング">
+          <button data-shading="smooth" aria-pressed="true">スムース <kbd>S</kbd></button>
+          <button data-shading="flat" aria-pressed="false">フラット</button>
+        </div>
+        <div class="checks">
+          <label><input type="checkbox" id="sSurface" checked>曲面</label>
+          <label><input type="checkbox" id="sCurves" checked>ベジェ曲線</label>
+          <label><input type="checkbox" id="sCage" checked>ケージ</label>
+          <label><input type="checkbox" id="sCtrl">制御点</label>
+          <label><input type="checkbox" id="sGizmo" checked>移動ハンドル</label>
+        </div>
+        <div class="row"><label for="tau">ハンドル長</label><input id="tau" type="range" min="0.3" max="1.5" step="0.05" value="1"><output id="tauV">1.00</output></div>
+        <div class="row"><label for="div">分割数</label><input id="div" type="range" min="4" max="16" step="1" value="8"><output id="divV">8</output></div>
+      </div>
+      <div class="sec">
+        <h2>情報と連続性の検証</h2>
+        <dl class="meter">
+          <dt>頂点 / 辺 / 面</dt><dd id="mCount">-</dd>
+          <dt>パッチ</dt><dd id="mKinds">-</dd>
+          <dt>辺の種類</dt><dd id="mEdges">-</dd>
+          <dt>位置の隙間（G0・全辺）</dt><dd id="mG0">-</dd>
+          <dt>法線の最大差（G1）</dt><dd id="mG1">-</dd>
+        </dl>
+        <div class="warn" id="g1warn" hidden>G1 が成立していない辺があります。凹んだ角や薄い面では、接平面を決められないことがあります。折れ目にすると解消する場合があります。</div>
+      </div>
+    </aside>
+  </main>
+</div>
+<script type="module" src="./editor.js"></script>
+</body>
+</html>
