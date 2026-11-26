@@ -1,0 +1,1 @@
+{"name":"mirror-map-eps-nan","op":"mirror_map","input":{"v":[[0,0,0],[1,0,0],[-1,0,0]],"eps":"NaN"},"output":[2,2,2]}

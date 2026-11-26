@@ -1,0 +1,1 @@
+{"name":"convert-selection-empty-face","op":"convert_selection","input":{"model":{"v":[[0,0,0],[1,0,0],[0,0,-1]],"f":[[0,1,2],[]],"creases":[]},"from":"v","items":[0],"to":"f"},"output":[1]}

@@ -1,0 +1,1 @@
+{"name":"edge-map-repeated-vertex","op":"edge_map","input":{"f":[[0,1,0,2]]},"output":[{"a":0,"b":1,"faces":[0,0]},{"a":0,"b":2,"faces":[0,0]}]}
