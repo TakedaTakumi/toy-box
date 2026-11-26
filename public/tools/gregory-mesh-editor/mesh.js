@@ -180,6 +180,37 @@ export function toggleCreases(model, edgeKeys) {
   return out;
 }
 
+// 選択の要素（点は頂点番号、辺は "a-b"、面は面番号）に含まれる頂点の集合。不正な要素は無視する
+export function selectionVertices(model, mode, items) {
+  const out = new Set();
+  const nV = model.V.length;
+  const isVertex = (x) => Number.isInteger(x) && x >= 0 && x < nV;
+  for (const it of items) {
+    if (mode === 'v') {
+      if (isVertex(it)) out.add(it);
+    } else if (mode === 'e') {
+      const ends = typeof it === 'string' ? it.split('-').map(Number) : [];
+      if (ends.length === 2 && ends.every(isVertex)) ends.forEach((x) => out.add(x));
+    } else if (Number.isInteger(it) && it >= 0 && it < model.F.length) {
+      model.F[it].forEach((v) => out.add(v));
+    }
+  }
+  return out;
+}
+
+// 選択を別のモードの要素に変換する。辺は両端が選ばれたもの、面はすべての頂点が選ばれたもの
+export function convertSelection(model, from, items, to) {
+  const verts = selectionVertices(model, from, items);
+  const out = new Set();
+  if (to === 'v') verts.forEach((v) => out.add(v));
+  else if (to === 'e') {
+    for (const [k, e] of edgeMap(model.F)) if (verts.has(e.a) && verts.has(e.b)) out.add(k);
+  } else {
+    model.F.forEach((f, i) => { if (f.every((v) => verts.has(v))) out.add(i); });
+  }
+  return out;
+}
+
 // x=0 の面について対称な頂点の組を、位置の一致で探す。無ければ -1
 export function mirrorMap(V, eps = 1e-4) {
   // 0 をはさんで丸めが対称になるよう、絶対値で丸める

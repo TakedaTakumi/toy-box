@@ -55,15 +55,7 @@ function redo() {
 }
 
 // ---- 選択 ----
-const vertsOf = (items, mode = state.mode, model = state.model) => {
-  const out = new Set();
-  for (const it of items) {
-    if (mode === 'v') out.add(it);
-    else if (mode === 'e') it.split('-').forEach((x) => out.add(Number(x)));
-    else model.F[it].forEach((v) => out.add(v));
-  }
-  return out;
-};
+const vertsOf = (items, mode = state.mode, model = state.model) => M.selectionVertices(model, mode, items);
 
 function mirrorItem(item, mm) {
   const { model, mode } = state;
@@ -101,12 +93,7 @@ function select(item, additive) {
 
 function setMode(next) {
   if (next === state.mode) return;
-  const verts = vertsOf(state.sel);
-  const { F } = state.model;
-  const sel = new Set();
-  if (next === 'v') verts.forEach((v) => sel.add(v));
-  else if (next === 'e') for (const [k, e] of M.edgeMap(F)) if (verts.has(e.a) && verts.has(e.b)) sel.add(k);
-  else F.forEach((f, i) => { if (f.every((v) => verts.has(v))) sel.add(i); });
+  const sel = M.convertSelection(state.model, state.mode, state.sel, next);
   state.mode = next;
   state.sel = sel; state.primary = new Set(sel);
   syncUi(); schedule();

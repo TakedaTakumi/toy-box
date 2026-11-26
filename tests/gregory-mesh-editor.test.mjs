@@ -104,25 +104,114 @@ test('押し出し量が不正・極端でも、位相の正しいケージを�
   }));
 });
 
-test('範囲外・空・重複の面番号や、存在しない辺は、無視して元のケージのままにする', () => {
-  fc.assert(fc.property(presetKey, fc.array(fc.oneof(fc.integer(), fc.double(), fc.constant(NaN)), { maxLength: 4 }), fc.array(fc.string(), { maxLength: 3 }), (key, idx, keys) => {
+const same = (a, b) => JSON.stringify([a.V, a.F, [...a.creases]]) === JSON.stringify([b.V, b.F, [...b.creases]]);
+
+test('有効な面番号が1つもなければ、押し出しはケージを変えない', () => {
+  fc.assert(fc.property(presetKey, fc.array(fc.oneof(fc.integer({ min: -100, max: -1 }), fc.integer({ min: 100, max: 1000 }), fc.double({ noInteger: true }), fc.constant(NaN)), { maxLength: 4 }), (key, idx) => {
     const m = M.PRESETS[key].make();
-    const valid = (i) => Number.isInteger(i) && i >= 0 && i < m.F.length;
     const r = M.extrudeFaces(m, idx, 0.3);
-    assert.equal(r.faces.length, new Set(idx.filter(valid)).size);
-    assert.deepEqual(M.validateModel(r.model), []);
-    const cut = M.loopCut(m, keys.filter((k) => !M.edgeMap(m.F).has(k)));
-    assert.deepEqual(cut.edges, []);
-    assert.equal(cut.model.F.length, m.F.length);
+    assert.deepEqual(r.faces, []);
+    assert.ok(same(r.model, m));
   }));
 });
 
-test('すべての面を削除する指定でも、使われない頂点は残らない', () => {
+test('有効な面番号と無効な番号が混ざっていても、有効な面だけを押し出して位相が正しい', () => {
+  fc.assert(fc.property(presetKey, fc.array(fc.oneof(fc.integer(), fc.double(), fc.constant(NaN)), { maxLength: 4 }), (key, idx) => {
+    const m = M.PRESETS[key].make();
+    const valid = new Set(idx.filter((i) => Number.isInteger(i) && i >= 0 && i < m.F.length));
+    const r = M.extrudeFaces(m, idx, 0.3);
+    assert.equal(r.faces.length, valid.size);
+    assert.deepEqual(M.validateModel(r.model), []);
+  }));
+});
+
+test('存在しない辺だけを指定したループ分割は、ケージを変えない', () => {
+  fc.assert(fc.property(presetKey, fc.array(fc.string(), { maxLength: 3 }), (key, keys) => {
+    const m = M.PRESETS[key].make();
+    const cut = M.loopCut(m, keys.filter((k) => !M.edgeMap(m.F).has(k)));
+    assert.deepEqual(cut.edges, []);
+    assert.ok(same(cut.model, m));
+  }));
+});
+
+test('面を削除すると、使われない頂点が残らず、位相が正しい（すべての面は残す）', () => {
   fc.assert(fc.property(presetKey, fc.array(fc.nat(100), { maxLength: 5 }), (key, picks) => {
     const m = M.PRESETS[key].make();
     if (m.F.length <= 1) return;
     const out = M.deleteFaces(m, picks.map((p) => p % m.F.length).slice(0, m.F.length - 1));
     assert.deepEqual(M.validateModel(out), []);
+  }));
+});
+
+test('すべての面を削除すると、頂点も面も空になる（画面側では全削除を許さない）', () => {
+  fc.assert(fc.property(presetKey, (key) => {
+    const m = M.PRESETS[key].make();
+    const out = M.deleteFaces(m, m.F.map((_, i) => i));
+    assert.deepEqual([out.V.length, out.F.length], [0, 0]);
+  }));
+});
+
+const modes = fc.constantFrom('v', 'e', 'f');
+// 各モードの要素を、ケージの範囲から選ぶ
+function pickItems(m, mode, picks) {
+  const keys = [...M.edgeMap(m.F).keys()];
+  const pool = mode === 'v' ? m.V.map((_, i) => i) : mode === 'e' ? keys : m.F.map((_, i) => i);
+  return [...new Set(picks.map((p) => pool[p % pool.length]))];
+}
+const picksArb = fc.array(fc.nat(1000), { maxLength: 6 });
+
+test('選択を変換すると、新しいモードの要素だけになり、範囲内に収まる', () => {
+  fc.assert(fc.property(presetKey, modes, modes, picksArb, (key, from, to, picks) => {
+    const m = M.PRESETS[key].make();
+    const out = M.convertSelection(m, from, pickItems(m, from, picks), to);
+    const edges = M.edgeMap(m.F);
+    for (const it of out) {
+      if (to === 'e') assert.ok(typeof it === 'string' && edges.has(it), `辺でない要素: ${it}`);
+      else if (to === 'v') assert.ok(Number.isInteger(it) && it >= 0 && it < m.V.length);
+      else assert.ok(Number.isInteger(it) && it >= 0 && it < m.F.length);
+    }
+  }));
+});
+
+test('面の選択を点に変換すると、選んだ面の頂点の和集合になる', () => {
+  fc.assert(fc.property(presetKey, picksArb, (key, picks) => {
+    const m = M.PRESETS[key].make();
+    const faces = pickItems(m, 'f', picks);
+    const want = new Set(faces.flatMap((i) => m.F[i]));
+    assert.deepEqual([...M.convertSelection(m, 'f', faces, 'v')].sort((a, b) => a - b), [...want].sort((a, b) => a - b));
+  }));
+});
+
+test('面の選択を辺や点を経由して面に戻しても、選んだ面は残る', () => {
+  fc.assert(fc.property(presetKey, picksArb, (key, picks) => {
+    const m = M.PRESETS[key].make();
+    const faces = pickItems(m, 'f', picks);
+    for (const via of ['v', 'e']) {
+      const back = M.convertSelection(m, via, M.convertSelection(m, 'f', faces, via), 'f');
+      for (const f of faces) assert.ok(back.has(f), `面${f}が失われた（${via}経由）`);
+    }
+  }));
+});
+
+test('面を1枚選んで辺モードにすると、その面の辺だけが選ばれ、数値は混ざらない（面番号の混入の再発防止）', () => {
+  const m = M.PRESETS.cube.make();
+  const edges = M.convertSelection(m, 'f', [0], 'e');
+  assert.equal(edges.size, 4);
+  for (const k of edges) assert.equal(typeof k, 'string');
+});
+
+test('面の全頂点を選んで面モードにすると、その面が選ばれる（空にならない）', () => {
+  const m = M.PRESETS.cube.make();
+  assert.deepEqual([...M.convertSelection(m, 'v', m.F[0], 'f')].includes(0), true);
+});
+
+test('不正な選択の要素（範囲外・小数・NaN・型違い・壊れた辺の名前）は、無視して例外を出さない', () => {
+  const junk = fc.oneof(fc.integer(), fc.double(), fc.string(), fc.constant(undefined), fc.constant(null), fc.boolean(), fc.constant('1-'), fc.constant('-1-2'), fc.constant('a-b'));
+  fc.assert(fc.property(presetKey, modes, modes, fc.array(junk, { maxLength: 6 }), (key, from, to, items) => {
+    const m = M.PRESETS[key].make();
+    const out = M.convertSelection(m, from, items, to);
+    assert.ok(out instanceof Set);
+    for (const v of M.selectionVertices(m, from, items)) assert.ok(Number.isInteger(v) && v >= 0 && v < m.V.length);
   }));
 });
 
