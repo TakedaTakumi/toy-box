@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>グレゴリーメッシュエディタ試作</title>
+<style>
+  :root { color-scheme: light dark; --bg:#f4f6fb; --surface:#fff; --ink:#1c2438; --muted:#5d6a85; --line:#dde3ef; --accent:#4f6bed; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#11151f; --surface:#1a2030; --ink:#e8ecf6; --muted:#9aa6c0; --line:#2b3550; --accent:#8da2ff; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); line-height:1.8;
+    font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif; }
+  main { max-width: 52rem; margin: 0 auto; padding: 32px 16px 64px; }
+  nav a { color: var(--accent); }
+  article { margin-top: 16px; padding: 8px 24px 24px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow-wrap: anywhere; }
+  h1 { font-size: 1.6rem; }
+  h2 { margin-top: 2rem; padding-left: 12px; border-left: 4px solid var(--accent); font-size: 1.25rem; }
+  a { color: var(--accent); }
+  code { padding: 1px 5px; border-radius: 4px; background: var(--bg); font-size: .9em; }
+  pre { padding: 12px 16px; border-radius: 8px; background: var(--bg); overflow-x: auto; }
+  pre code { padding: 0; background: none; }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; }
+  th, td { padding: 6px 10px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+  th { background: var(--bg); }
+</style>
+</head>
+<body>
+<main>
+<nav><a href="../../">&larr; toy-box 一覧へ</a> / <a href="./">プロトタイプを開く</a></nav>
+<article>
+<h1>グレゴリーメッシュエディタ試作</h1>
+<p>ケージ（点・辺・面のメッシュ）を編集すると、辺のベジェ曲線が自動で決まり、<strong>四角形と三角形のグレゴリーパッチが G1 連続で貼られる</strong>ブラウザ上の試作です。メタセコイア風の編集操作（選択モード、押し出し、ループ分割、ミラー、Undo）が、この曲面の上で成り立つかを確かめるための最小版です。</p>
+<ul>
+<li>成果物：HTML と JavaScript（ES モジュール）。ビルドは不要</li>
+<li>試作リンク：<a href="https://takedatakumi.github.io/toy-box/tools/gregory-mesh-editor/">https://takedatakumi.github.io/toy-box/tools/gregory-mesh-editor/</a></li>
+<li>数学の試作（頂点を動かすだけの版）を土台に、編集操作を足したもの</li>
+</ul>
+<h2>何を確かめるための試作か</h2>
+<div class="table-wrap"><table><thead><tr>
+<th>問い</th>
+<th>この試作での見せ方</th>
+</tr>
+</thead><tbody><tr>
+<td>ケージ駆動型の操作でグレゴリー曲面を作れるか</td>
+<td>立方体や平面から、押し出しとループ分割で形を作る</td>
+</tr>
+<tr>
+<td>編集のたびに曲面が G1 連続のままか</td>
+<td>画面右の「連続性の検証」で、辺ごとの法線の最大差を表示する</td>
+</tr>
+<tr>
+<td>ミラー編集が曲面でも自然に働くか</td>
+<td>x=0 の面で左右対称に、選択・移動・押し出しを行う</td>
+</tr>
+</tbody></table></div><h2>使い方</h2>
+<ol>
+<li>「新しい形状から始める」で、立方体・平面・四角錐・三角柱から選ぶ</li>
+<li>選択モード（点・辺・面）を切り替え、要素をクリックして選ぶ。Shift（または Ctrl）を押しながらで追加・解除</li>
+<li>選んだ要素の中心に出る移動ハンドル（X/Y/Z の矢印、平面の四角）をドラッグして、軸や平面に沿って移動する。要素そのもののドラッグは、画面に平行な移動。空所のドラッグは視点の回転</li>
+<li>面モードで面を選び、押し出しを行う。辺モードで辺を選び、ループ分割や折れ目の切り替えを行う</li>
+<li>形が崩れたら、元に戻す（Ctrl+Z）で戻す</li>
+</ol>
+<h3>操作とショートカット</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>操作</th>
+<th>ショートカット</th>
+<th>内容</th>
+</tr>
+</thead><tbody><tr>
+<td>点・辺・面モード</td>
+<td><code>1</code> / <code>2</code> / <code>3</code></td>
+<td>選択モードの切り替え。選択は、新しいモードの要素に変換される</td>
+</tr>
+<tr>
+<td>すべて選択 / 解除</td>
+<td><code>Ctrl+A</code> / <code>Esc</code></td>
+<td></td>
+</tr>
+<tr>
+<td>押し出し</td>
+<td><code>E</code></td>
+<td>選んだ面を、面の法線方向に押し出す（面モード）</td>
+</tr>
+<tr>
+<td>ループ分割</td>
+<td><code>L</code></td>
+<td>選んだ辺と平行な辺を四角形の列にそって集め、すべて中点で分割する（辺モード）</td>
+</tr>
+<tr>
+<td>削除</td>
+<td><code>Del</code></td>
+<td>選んだ要素に接する面を削除する。使われなくなった頂点も取り除く</td>
+</tr>
+<tr>
+<td>折れ目の切り替え</td>
+<td><code>C</code></td>
+<td>選んだ辺の G1 を切る。すべて折れ目なら解除する（辺モード）</td>
+</tr>
+<tr>
+<td>ミラー編集</td>
+<td><code>M</code></td>
+<td>x=0 の面で左右対称に編集する</td>
+</tr>
+<tr>
+<td>シェーディング</td>
+<td><code>S</code></td>
+<td>スムース（法線をピクセルごとに補間）とフラット（細かい三角形ごとに面の向きで明るさを決める）を切り替える。初期値はスムース</td>
+</tr>
+<tr>
+<td>移動ハンドル</td>
+<td>矢印・四角をドラッグ</td>
+<td>選択した要素の中心に出る X/Y/Z の矢印は、その軸に沿って移動する。矢印の間の四角（XY・YZ・ZX）は、その平面の上で移動する。つかむと橙色になる。「表示」で隠せる</td>
+</tr>
+<tr>
+<td>移動の軸</td>
+<td><code>X</code> / <code>Y</code> / <code>Z</code></td>
+<td>移動を軸に沿わせる。もう一度押すと自由に戻る</td>
+</tr>
+<tr>
+<td>元に戻す / やり直し</td>
+<td><code>Ctrl+Z</code> / <code>Ctrl+Shift+Z</code></td>
+<td>100 回まで</td>
+</tr>
+<tr>
+<td>視点</td>
+<td>ドラッグ / ホイール / ＋－</td>
+<td>空所のドラッグか右ボタンで回転。ホイールかピンチで拡大縮小</td>
+</tr>
+</tbody></table></div><h2>機能仕様</h2>
+<h3>曲面の作り方</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>項目</th>
+<th>内容</th>
+</tr>
+</thead><tbody><tr>
+<td>辺</td>
+<td>3次ベジェ曲線。両端の接線は、頂点の法線に垂直な平面へ辺の向きを射影して決め、長さを辺長 × ハンドル長にする</td>
+</tr>
+<tr>
+<td>四角形の面</td>
+<td>四角形グレゴリーパッチ（3次の境界曲線と、角ごとに2点の内部制御点）</td>
+</tr>
+<tr>
+<td>三角形の面</td>
+<td>3次の境界曲線を4次のベジェ三角形に次数上げし、角ごとに2点の内部制御点を持たせたグレゴリーパッチ</td>
+</tr>
+<tr>
+<td>G1 連続</td>
+<td>辺ごとに両側の面で共有する接線場を決め、内部制御点をそこから求める</td>
+</tr>
+<tr>
+<td>頂点の法線</td>
+<td>角度重みの面法線の和。折れ目で区切られた面のまとまりごとに持つ。接平面へ射影して角が裏返る場合は、重みなしの和、各面の法線の順に候補を替える</td>
+</tr>
+<tr>
+<td>折れ目</td>
+<td>辺の曲線は両側の面で共有する（位置は連続）。辺の接線は両側の接平面の交線の向きにする。両側の面がほぼ同じ平面（約3°未満）のときは、交線の向きが不安定なので、その頂点では折れ目として扱わず、同じ面のまとまりにする</td>
+</tr>
+</tbody></table></div><h3>編集操作の仕様</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>操作</th>
+<th>仕様</th>
+</tr>
+</thead><tbody><tr>
+<td>押し出し</td>
+<td>選択した面を、頂点ごとの法線方向（選択面の法線の平均）へ、押し出し量だけ移動して複製し、境界に側面を足す。辺でつながった面の扇ごとに頂点を複製する。押し出し量は、画面のスライダーでは 0.1〜1.2（負の値は指定できない）。関数としては 0.02〜100 に丸め、NaN などの不正な値は 0.02 にする</td>
+</tr>
+<tr>
+<td>ループ分割</td>
+<td>四角形では対辺をたどって分割する。三角形に当たると、印の付く辺の数で分割が変わる（1本なら2つの三角形、2本なら三角形と四角形、3本なら4つの三角形）。折れ目の辺は、分割後の両半分に折れ目を引き継ぐ。新しい頂点は、辺のベジェ曲線の中点に置く</td>
+</tr>
+<tr>
+<td>削除</td>
+<td>点・辺は、接する面ごと削除する。すべての面は削除できない</td>
+</tr>
+<tr>
+<td>ミラー編集</td>
+<td>x=0 の面について位置が一致する頂点を組にして、選択・移動・押し出しを対称に行う。x=0 上の頂点は、x を 0 に保つ</td>
+</tr>
+</tbody></table></div><h3>面の制約</h3>
+<ul>
+<li>面は 3 辺か 4 辺だけ。押し出しもループ分割も、この制約を保つ</li>
+<li>辺は 2 面までで共有する</li>
+</ul>
+<h3>検証表示</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>項目</th>
+<th>内容</th>
+</tr>
+</thead><tbody><tr>
+<td>位置の隙間（G0）</td>
+<td>共有する辺の9点で、両側のパッチの位置の差の最大値（折れ目の辺も含む）</td>
+</tr>
+<tr>
+<td>法線の最大差（G1）</td>
+<td>折れ目でない共有辺の9点で、両側のパッチの法線の角度差の最大値。0.5° 未満を「G1 成立」とする</td>
+</tr>
+</tbody></table></div><h2>実装メモ</h2>
+<div class="table-wrap"><table><thead><tr>
+<th>項目</th>
+<th>内容</th>
+</tr>
+</thead><tbody><tr>
+<td>構成</td>
+<td><code>index.html</code>（画面）、<code>editor.js</code>（描画・入力・編集操作）、<code>mesh.js</code>（ケージの編集操作）、<code>gregory.js</code>（グレゴリーパッチの数学）</td>
+</tr>
+<tr>
+<td>座標系</td>
+<td>右手系の Y-up（上が +Y、右が +X、手前が +Z）。ミラーの面は x=0。軸の色は、X が赤、Y が緑、Z が青</td>
+</tr>
+<tr>
+<td>描画</td>
+<td>曲面は、CPU のソフトウェアラスタライザ。三角形ごとに深度バッファで塗り、スムースでは法線を遠近を考慮してピクセルごとに補間する。2倍の解像度で描いて縮小し、輪郭を滑らかにする。背面は法線で間引く。線・点・ミラー面などは Canvas 2D で重ねる</td>
+</tr>
+<tr>
+<td>外部依存</td>
+<td>フォントのみ。JavaScript のライブラリは使っていない</td>
+</tr>
+<tr>
+<td>実行</td>
+<td>ES モジュールを使うため、<code>file://</code> では動かない。ローカルでは <code>python3 -m http.server -d public</code> などで配信して確認する</td>
+</tr>
+<tr>
+<td>保存</td>
+<td>なし（ページを開き直すと初期状態に戻る）</td>
+</tr>
+</tbody></table></div><h2>既知の制約</h2>
+<ul>
+<li>凹んだ角（頂点まわりの角度の合計が 360° を大きく超える鞍型の角）や、押し出し量の小さい薄い壁では、頂点の接平面を決められず、G1 が成立しないことがある。画面に「G1 不成立」と表示される。折れ目にすると解消する場合がある</li>
+<li>折れ目と押し出しを組み合わせた複雑な形でも、G1 が崩れる場合がある</li>
+<li>押し出し量が負だと、既存の面と重なる形になる。画面からは指定できないが、関数に負の量を渡すと起きる。これを避ける仕組みはない</li>
+<li>ミラー編集をいったん切って頂点を動かすと、対称が崩れた頂点は、組として扱われない</li>
+<li>辺だけを単独で分割する操作はない（四角形が5辺になるため）。頂点を足す操作は、ループ分割だけ</li>
+<li>背面の頂点や辺は、可視判定が法線による近似のため、選べない</li>
+<li>移動ハンドルは、曲面の奥にあっても手前に描く（深度を考慮しない）。平面ハンドルは、視線が平面とほぼ平行になると、移動量が大きくなる</li>
+<li>曲面の描画は CPU で行うため、分割数を大きくすると重くなる（分割数 16 で、1フレームあたり 30ms 弱）。編集中は、初期値の 8 を勧める</li>
+<li>ハンドルの個別編集、保存と書き出し、5辺以上の面の分割には対応していない</li>
+</ul>
+<h2>テスト</h2>
+<p><code>npm test</code>（<code>tests/gregory-mesh-editor.test.mjs</code>）で、次の性質をランダムな入力で確認している。</p>
+<ul>
+<li>任意の押し出し・ループ分割・削除・折れ目の操作列のあとで、面が 3〜4 辺、辺が 2 面までで共有、有向辺の向きが整合し、使われない頂点がなく、曲面の評価値が有限であること</li>
+<li>ループ分割だけの操作列のあとで、G1 の法線差が 1° 未満、G0 の隙間が 1e-9 未満であること</li>
+<li>4つのプリセット（立方体・平面・四角錐・三角柱）に、頂点のゆらぎと折れ目の入れ方をランダムに与えても、全辺の G0 が 1e-9 未満、滑らかな辺の G1 が 0.05° 未満であること</li>
+<li>1枚の面の押し出しで、面と頂点がその面の辺の数だけ増えること</li>
+<li>選択の変換（点・辺・面の切り替え）で、新しいモードの要素だけになり、範囲内に収まること。面の選択を点にすると頂点の和集合になり、辺や点を経由して面に戻しても元の面が残ること</li>
+<li>不正な入力（NaN・無限大・極端に大きい押し出し量、範囲外・整数でない・重複した面番号、存在しない辺、壊れた選択の要素）を、無視または範囲に丸めて、位相の正しいケージを保つこと。有効な面番号が1つもなければ、押し出しはケージを変えないこと</li>
+<li>ミラーの対応付けが、組になる頂点どうしで対称で、互いを指し合うこと</li>
+</ul>
+<p>画面の操作（選択、ドラッグ、Undo/Redo、シェーディングの切り替え）は、ブラウザで手動確認した。自動テストの対象外。</p>
+<h2>ファイル構成</h2>
+<pre><code>public/tools/gregory-mesh-editor/
+├─ index.html   # 画面
+├─ editor.js    # 描画・入力・編集操作
+├─ mesh.js      # ケージの編集操作（押し出し、ループ分割、削除、折れ目、ミラーの対応付け）
+├─ gregory.js   # グレゴリーパッチの数学（辺の曲線、内部制御点、テッセレーション）
+└─ README.md    # このページ
+
+tests/gregory-mesh-editor.test.mjs  # 上記のテスト
+</code></pre>
+
+</article>
+</main>
+</body>
+</html>
