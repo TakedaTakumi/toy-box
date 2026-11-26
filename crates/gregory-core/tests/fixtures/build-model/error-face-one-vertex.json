@@ -1,0 +1,1 @@
+{"name":"error-face-one-vertex","input":{"creases":[],"tau":1,"mode":"g1","n":4,"v":[[0,0,0],[1,0,0],[0,0,-1]],"f":[[0,1,2],[0]]},"error":"TypeError: Cannot read properties of undefined (reading '0')"}
