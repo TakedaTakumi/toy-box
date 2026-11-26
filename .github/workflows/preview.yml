@@ -17,6 +17,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        if: github.event.action != 'closed'
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      # rustup 1.28 以降は show だけでは導入しないため、toolchain install で rust-toolchain.toml の版を入れる
+      - if: github.event.action != 'closed'
+        run: |
+          rustup toolchain install
+          rustup show
+      - if: github.event.action != 'closed'
+        run: cargo test --workspace --locked
       - uses: actions/setup-node@v4
         if: github.event.action != 'closed'
         with:
