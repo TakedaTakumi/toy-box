@@ -112,11 +112,15 @@ pub fn show(ui: &mut Ui, camera: &mut OrbitCamera, content: &ViewportContent<'_>
     }
 
     let margin = egui::vec2(8.0, 8.0);
-    painter.text(
-        rect.left_top() + margin,
-        Align2::LEFT_TOP,
-        "ドラッグで回転 / ホイール・ピンチで拡大縮小 / ダブルクリックで視点をリセット",
+    let hint = painter.layout(
+        "ドラッグで回転 / ホイール・ピンチで拡大縮小 / ダブルクリックで視点をリセット".to_owned(),
         FontId::proportional(12.0),
+        ui.visuals().weak_text_color(),
+        (rect.width() - margin.x * 2.0).max(0.0),
+    );
+    painter.galley(
+        rect.left_top() + margin,
+        hint,
         ui.visuals().weak_text_color(),
     );
     if let Some(message) = content.message {

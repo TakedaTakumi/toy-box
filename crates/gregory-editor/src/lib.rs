@@ -6,7 +6,7 @@ mod fonts;
 pub mod memo;
 pub mod mesh_buffers;
 pub mod palette;
-mod panels;
+pub mod panels;
 pub mod readouts;
 pub mod scene;
 pub mod settings;
