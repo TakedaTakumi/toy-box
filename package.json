@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "font:subset": "bash scripts/subset-ui-font.sh",
     "build:docs": "node scripts/build-docs.mjs",
     "export:fixtures": "node scripts/export-gregory-fixtures.mjs",
     "test": "node --test tests/*.test.mjs"

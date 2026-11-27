@@ -1,0 +1,31 @@
+[package]
+name = "gregory-editor"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+gregory-core = { path = "../gregory-core" }
+bytemuck = { version = "1", features = ["derive"] }
+# 日本語のフォントは自前で登録するため、egui 同梱のフォント（default_fonts）は入れない。
+# `wgpu` は egui-wgpu の既定の feature（wgpu の既定 = WebGPU・Vulkan など、と WebGL2 用の `webgl`）を有効にする。
+# `x11`・`wayland` は Linux のネイティブ版のウィンドウに要る（web では使われない）。
+eframe = { version = "0.37", default-features = false, features = ["wgpu", "x11", "wayland"] }
+egui = { version = "0.37", default-features = false }
+egui-wgpu = { version = "0.37", default-features = false }
+# egui-wgpu 0.37 と同じ 30.0 系。feature は eframe の `wgpu` 経由で決まるので、ここでは型の参照にだけ使う。
+wgpu = { version = "30.0", default-features = false }
+log = "0.4"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen-futures = "0.4"
+web-sys = { version = "0.3", features = ["Document", "Element", "HtmlCanvasElement", "Node", "Window"] }
+
+[dev-dependencies]
+proptest = { workspace = true }
+# サブセットフォントの cmap 検査用（egui が使うフォント解析と同系統）
+skrifa = { version = "0.44", default-features = false }
+
+[lints]
+workspace = true

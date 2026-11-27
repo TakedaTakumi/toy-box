@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#1b1b1b">
+<title>グレゴリー曲面モデラ（Rust 版）</title>
+<base data-trunk-public-url />
+<link data-trunk rel="rust" data-bin="gregory-editor" data-wasm-opt="2" />
+<link data-trunk rel="copy-file" href="README.md" />
+<link data-trunk rel="copy-file" href="assets/fonts/LICENSE" data-target-path="fonts" />
+<link data-trunk rel="copy-file" href="assets/fonts/LICENSE_Hack" data-target-path="fonts" />
+<link data-trunk rel="copy-file" href="assets/fonts/LICENSE_GenJyuuGothic" data-target-path="fonts" />
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    /* egui のダークテーマのパネルと同じ色 */
+    background: #1b1b1b;
+    color: #b4b4b4;
+    touch-action: none;
+  }
+  #the_canvas_id {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  #loading_text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    max-width: calc(100% - 32px);
+    transform: translate(-50%, -50%);
+    font: 14px/1.6 system-ui, sans-serif;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<canvas id="the_canvas_id"></canvas>
+<p id="loading_text">読み込み中…</p>
+<script>
+  // wasm の取得・初期化に失敗すると loading 表示が残り続けるため、一定時間後に案内を足す
+  setTimeout(function () {
+    var el = document.getElementById("loading_text");
+    if (el) {
+      el.textContent = "読み込みに失敗したか、時間がかかっています。ページを再読み込みしてください（詳細はコンソール）";
+    }
+  }, 20000);
+</script>
+</body>
+</html>

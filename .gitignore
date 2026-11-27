@@ -1,3 +1,4 @@
 node_modules/
 public/**/README.html
 target/
+public/tools/gregory-modeler/
