@@ -158,6 +158,7 @@ impl SceneRenderer {
                 step_mode: wgpu::VertexStepMode::Vertex,
                 attributes: &surface_attributes,
             },
+            always_on_top: false,
         });
         let line_attributes = wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3];
         let line_pipeline = factory.create(&PipelineSpec {
@@ -170,6 +171,7 @@ impl SceneRenderer {
                 step_mode: wgpu::VertexStepMode::Vertex,
                 attributes: &line_attributes,
             },
+            always_on_top: true,
         });
         let point_attributes = wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3];
         let point_pipeline = factory.create(&PipelineSpec {
@@ -182,6 +184,7 @@ impl SceneRenderer {
                 step_mode: wgpu::VertexStepMode::Instance,
                 attributes: &point_attributes,
             },
+            always_on_top: true,
         });
 
         Self {
@@ -282,6 +285,8 @@ struct PipelineSpec<'a> {
     fragment_entry: &'static str,
     topology: wgpu::PrimitiveTopology,
     buffer: wgpu::VertexBufferLayout<'a>,
+    /// 曲面との前後に関係なく手前に描く（深度を書かない）。
+    always_on_top: bool,
 }
 
 struct PipelineFactory<'a> {
@@ -296,8 +301,12 @@ impl PipelineFactory<'_> {
     fn create(&self, spec: &PipelineSpec<'_>) -> wgpu::RenderPipeline {
         let depth_stencil = self.depth_format.map(|format| wgpu::DepthStencilState {
             format,
-            depth_write_enabled: Some(true),
-            depth_compare: Some(wgpu::CompareFunction::LessEqual),
+            depth_write_enabled: Some(!spec.always_on_top),
+            depth_compare: Some(if spec.always_on_top {
+                wgpu::CompareFunction::Always
+            } else {
+                wgpu::CompareFunction::LessEqual
+            }),
             stencil: wgpu::StencilState::default(),
             bias: wgpu::DepthBiasState::default(),
         });

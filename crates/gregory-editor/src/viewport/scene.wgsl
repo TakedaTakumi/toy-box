@@ -11,9 +11,6 @@ struct Uniforms {
 
 @group(0) @binding(0) var<uniform> u: Uniforms;
 
-// 線と点が曲面に埋もれないよう、カメラ側へ寄せる割合
-const OVERLAY_PULL: f32 = 0.006;
-
 fn srgb_to_linear(c: vec3<f32>) -> vec3<f32> {
     let lo = c / 12.92;
     let hi = pow((c + vec3<f32>(0.055)) / 1.055, vec3<f32>(2.4));
@@ -26,11 +23,6 @@ fn to_output(c: vec3<f32>) -> vec4<f32> {
         return vec4<f32>(srgb_to_linear(clamped), 1.0);
     }
     return vec4<f32>(clamped, 1.0);
-}
-
-fn overlay_clip(position: vec3<f32>) -> vec4<f32> {
-    let pulled = mix(position, u.eye.xyz, OVERLAY_PULL);
-    return u.view_proj * vec4<f32>(pulled, 1.0);
 }
 
 // ---- 曲面 ----
@@ -85,7 +77,7 @@ struct ColorOut {
 @vertex
 fn vs_line(@location(0) position: vec3<f32>, @location(1) color: vec3<f32>) -> ColorOut {
     var out: ColorOut;
-    out.clip = overlay_clip(position);
+    out.clip = u.view_proj * vec4<f32>(position, 1.0);
     out.color = color;
     return out;
 }
@@ -106,7 +98,7 @@ fn vs_point(
         vec2<f32>(0.5, 0.5),
         vec2<f32>(-0.5, 0.5),
     );
-    var clip = overlay_clip(position);
+    var clip = u.view_proj * vec4<f32>(position, 1.0);
     let viewport = max(u.params.xy, vec2<f32>(1.0));
     clip = vec4<f32>(clip.xy + offsets[corner % 6u] * u.params.z * 2.0 / viewport * clip.w, clip.zw);
     var out: ColorOut;

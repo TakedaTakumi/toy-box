@@ -17,7 +17,7 @@ use crate::viewport::{self, GpuStatus, ViewportContent};
 
 pub struct GregoryEditorApp {
     settings: DisplaySettings,
-    /// 最初のフレームで画面幅を見て決める。
+    /// 画面幅が初めて有効になったフレームで1回だけ決める。
     layout: Option<PanelLayout>,
     camera: OrbitCamera,
     scene: Memo<BuildKey, Result<Scene, GregoryError>>,
@@ -82,9 +82,21 @@ impl eframe::App for GregoryEditorApp {
         self.frame_timer.record(frame.info().cpu_usage);
         self.handle_shortcuts(ui);
         let settings_before = self.settings;
-        let mut layout = self
-            .layout
-            .unwrap_or_else(|| PanelLayout::for_width(ui.max_rect().width()));
+        let ctx = ui.ctx().clone();
+        // 最初のフレームは画面の大きさが未確定で、egui が仮の大きな値を返すため使わない
+        if self.layout.is_none() && ctx.input(|i| i.raw.screen_rect.is_some()) {
+            self.layout = PanelLayout::for_width(ctx.content_rect().width());
+        }
+        if self.layout.is_none() {
+            ctx.request_repaint();
+        }
+        let mut layout = self.layout.unwrap_or(PanelLayout {
+            tools_open: false,
+            properties_open: false,
+        });
+        let screen_width = ctx.content_rect().width();
+        let (tools_min, tools_max) = panels::panel_width_range(screen_width, 150.0, 260.0);
+        let (props_min, props_max) = panels::panel_width_range(screen_width, 150.0, 280.0);
         let mut actions = PanelActions::default();
 
         Panel::top("menu_bar").show(ui, |ui| {
@@ -103,7 +115,7 @@ impl eframe::App for GregoryEditorApp {
         Panel::left("tools")
             .resizable(true)
             .default_size(200.0)
-            .size_range(150.0..=260.0)
+            .size_range(tools_min..=tools_max)
             .show_collapsible(ui, &mut layout.tools_open, |ui| {
                 actions.merge(panels::tool_panel::show(ui, &mut self.settings));
             });
@@ -112,14 +124,16 @@ impl eframe::App for GregoryEditorApp {
         Panel::right("properties")
             .resizable(true)
             .default_size(210.0)
-            .size_range(150.0..=280.0)
+            .size_range(props_min..=props_max)
             .show_collapsible(ui, &mut layout.properties_open, |ui| {
                 if let Some(scene) = self.scene.value() {
                     panels::properties_panel::show(ui, scene.as_ref());
                 }
             });
 
-        self.layout = Some(layout);
+        if self.layout.is_some() {
+            self.layout = Some(layout);
+        }
         if actions.reset_camera {
             self.camera.reset();
         }

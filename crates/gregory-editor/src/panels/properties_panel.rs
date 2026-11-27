@@ -9,7 +9,7 @@ use crate::scene::Scene;
 
 pub fn show(ui: &mut Ui, scene: Result<&Scene, &GregoryError>) {
     egui::ScrollArea::vertical().show(ui, |ui| {
-        ui.heading("プロパティ");
+        super::panel_heading(ui, "プロパティ");
         let scene = match scene {
             Ok(scene) => scene,
             Err(error) => {

@@ -9,7 +9,7 @@ use crate::settings::{DisplaySettings, SUBDIVISION_RANGE, Shading};
 pub fn show(ui: &mut Ui, settings: &mut DisplaySettings) -> PanelActions {
     let mut actions = PanelActions::default();
     egui::ScrollArea::vertical().show(ui, |ui| {
-        ui.heading("ツール");
+        super::panel_heading(ui, "ツール");
 
         CollapsingHeader::new("形状")
             .default_open(true)
