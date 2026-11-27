@@ -526,3 +526,27 @@ fn orbit_delta_stays_finite_after_a_non_finite_press_position() {
         "動いていないのでクリックとして解除される"
     );
 }
+
+proptest! {
+    // 非有限の位置での押下は、選択もドラッグも変えない。
+    #[test]
+    fn pressing_at_a_non_finite_position_changes_nothing(
+        p in preset(),
+        bad in prop_oneof![Just(f64::NAN), Just(f64::INFINITY), Just(f64::NEG_INFINITY)],
+        other in -100.0f64..100.0,
+        swap in any::<bool>(),
+        h in prop_oneof![Just(Handle::Axis(Axis::X)), Just(Handle::Plane(Plane::ZX))],
+        v in 0usize..8,
+    ) {
+        let pos = if swap { [other, bad] } else { [bad, other] };
+        let mut ed = Editor::new(p.make());
+        ed.press_element(Element::Vertex(0), false, [0.0, 0.0]);
+        ed.release();
+        let (sel, drag, rev) = (ed.selection().clone(), ed.drag().clone(), ed.revision());
+        ed.press_element(Element::Vertex(v), true, pos);
+        ed.press_handle(&view(), h, pos);
+        prop_assert_eq!(ed.selection(), &sel);
+        prop_assert_eq!(ed.drag(), &drag);
+        prop_assert_eq!(ed.revision(), rev);
+    }
+}

@@ -275,3 +275,60 @@ fn command_after_falls_back_to_start_when_the_cage_shrank() {
         other => panic!("{other:?}"),
     }
 }
+
+fn any_bad_pos() -> impl Strategy<Value = [f64; 2]> {
+    let bad = prop_oneof![Just(f64::NAN), Just(f64::INFINITY), Just(f64::NEG_INFINITY)];
+    (bad.clone(), bad, -100.0f64..100.0, 0u8..3).prop_map(|(a, b, g, k)| match k {
+        0 => [a, b],
+        1 => [a, g],
+        _ => [g, b],
+    })
+}
+
+fn finite_delta() -> impl Strategy<Value = Vec<[f64; 2]>> {
+    proptest::collection::vec([-50.0f64..50.0, -50.0f64..50.0], 1..20)
+}
+
+proptest! {
+    // 押した位置が非有限でも、有限の位置への移動で壊れた差分が出ないことを確かめる。
+    #[test]
+    fn dragging_from_a_non_finite_press_never_yields_non_finite_steps(
+        bad in any_bad_pos(),
+        orbit in any::<bool>(),
+        path in finite_delta(),
+    ) {
+        let cage = Preset::Cube.make();
+        let mut drag = if orbit {
+            Drag::begin_orbit(bad, true)
+        } else {
+            Drag::begin_move(bad, session(&cage, &[0]))
+        };
+        for p in path {
+            match drag.pointer_moved(p) {
+                DragStep::Nothing => {}
+                DragStep::Orbit { dx, dy } => prop_assert!(dx.is_finite() && dy.is_finite()),
+                DragStep::Move { total, pos } => {
+                    prop_assert!(total.iter().chain(&pos).all(|x| x.is_finite()));
+                }
+            }
+            match &drag {
+                Drag::Orbit(o) => prop_assert!(!o.moved.is_nan()),
+                Drag::Move(m) => prop_assert!(!m.moved.is_nan()),
+                Drag::Idle => {}
+            }
+        }
+    }
+
+    #[test]
+    fn releasing_a_non_finite_press_without_moving_is_a_click_or_nothing(
+        bad in any_bad_pos(),
+        clear in any::<bool>(),
+    ) {
+        let cage = Preset::Cube.make();
+        prop_assert_eq!(
+            Drag::begin_orbit(bad, clear).release(),
+            DragEnd::Click { clear_selection: clear }
+        );
+        prop_assert_eq!(Drag::begin_move(bad, session(&cage, &[0])).release(), DragEnd::Nothing);
+    }
+}
