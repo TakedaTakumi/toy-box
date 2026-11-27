@@ -44,6 +44,7 @@ pub struct DisplaySettings {
     subdivisions: usize,
     pub show_surface: bool,
     pub show_cage: bool,
+    pub show_curves: bool,
 }
 
 impl Default for DisplaySettings {
@@ -53,6 +54,7 @@ impl Default for DisplaySettings {
             subdivisions: DEFAULT_SUBDIVISIONS,
             show_surface: true,
             show_cage: true,
+            show_curves: true,
         }
     }
 }

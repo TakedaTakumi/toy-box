@@ -1,9 +1,10 @@
 use std::collections::HashSet;
 
 use gregory_core::{EdgeKey, PRESETS, Preset, SelectMode, Selection};
+use gregory_editor::editing::pick::EDGE_SAMPLES;
 use gregory_editor::mesh_buffers::{
-    Highlight, POINT_SIZE_OTHER, POINT_SIZE_SELECTED, POINT_SIZE_VERTEX_MODE, cage_lines,
-    cage_points, flat_surface, scene_geometry, smooth_surface,
+    Highlight, POINT_SIZE_OTHER, POINT_SIZE_SELECTED, POINT_SIZE_VERTEX_MODE, cage_points,
+    curve_lines, flat_surface, scene_geometry, smooth_surface,
 };
 use gregory_editor::palette;
 use gregory_editor::scene::{Scene, build_scene};
@@ -124,12 +125,13 @@ proptest! {
         let scene = scene_of(p);
         let mut h = Highlight::of(&selection(SelectMode::Edge, &scene, picks, junk));
         h.mode = m;
-        let lines = cage_lines(&scene.cage.v, &scene.model.edges, &h);
-        prop_assert_eq!(lines.len(), scene.model.edges.len() * 2);
+        let lines = curve_lines(&scene.model.edges, &h);
+        let per_edge = EDGE_SAMPLES * 2;
+        prop_assert_eq!(lines.len(), scene.model.edges.len() * per_edge);
         for (i, edge) in scene.model.edges.iter().enumerate() {
             let selected = m == SelectMode::Edge && h.edges.contains(&EdgeKey::new(edge.a, edge.b));
-            for end in 0..2 {
-                prop_assert_eq!(lines[i * 2 + end].color == palette::SELECTION, selected, "辺 {}-{}", edge.a, edge.b);
+            for end in 0..per_edge {
+                prop_assert_eq!(lines[i * per_edge + end].color == palette::SELECTION, selected, "辺 {}-{}", edge.a, edge.b);
             }
         }
     }
@@ -200,12 +202,12 @@ fn a_selected_crease_edge_uses_the_selection_color_over_the_crease_color() {
     let e = &scene.model.edges[crease_idx];
     let plain = Highlight::default();
     assert_eq!(
-        cage_lines(&scene.cage.v, &scene.model.edges, &plain)[crease_idx * 2].color,
+        curve_lines(&scene.model.edges, &plain)[crease_idx * EDGE_SAMPLES * 2].color,
         palette::CREASE_LINE
     );
     let h = Highlight::of(&Selection::Edges(vec![EdgeKey::new(e.a, e.b)]));
     assert_eq!(
-        cage_lines(&scene.cage.v, &scene.model.edges, &h)[crease_idx * 2].color,
+        curve_lines(&scene.model.edges, &h)[crease_idx * EDGE_SAMPLES * 2].color,
         palette::SELECTION
     );
 }

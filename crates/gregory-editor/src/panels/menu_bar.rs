@@ -48,6 +48,7 @@ pub fn show(
             ui.separator();
             ui.checkbox(&mut settings.show_surface, "曲面");
             ui.checkbox(&mut settings.show_cage, "ケージ");
+            ui.checkbox(&mut settings.show_curves, "ベジェ曲線");
             ui.separator();
             if ui.button("視点をリセット").clicked() {
                 actions.reset_camera = true;

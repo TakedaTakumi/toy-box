@@ -4,9 +4,11 @@ use std::collections::HashSet;
 
 use bytemuck::{Pod, Zeroable};
 use gregory_core::{
-    CageModel, Edge, EdgeKey, Model, SelectMode, Selection, TriMesh, Vec3, cross, norm, sub,
+    CageModel, Edge, EdgeKey, Model, SelectMode, Selection, TriMesh, Vec3, bezier3, cross, norm,
+    sub,
 };
 
+use crate::editing::pick::EDGE_SAMPLES;
 use crate::palette;
 use crate::settings::Shading;
 
@@ -88,6 +90,8 @@ pub struct SceneGeometry {
     pub surface: SurfaceMesh,
     /// 2つずつで1本の線分。
     pub cage_lines: Vec<LineVertex>,
+    /// 辺のベジェ曲線。2つずつで1本の線分。
+    pub curve_lines: Vec<LineVertex>,
     pub cage_points: Vec<PointInstance>,
 }
 
@@ -104,7 +108,8 @@ pub fn scene_geometry(
     };
     SceneGeometry {
         surface: surface_mesh(&model.mesh, shading, tinted),
-        cage_lines: cage_lines(&cage.v, &model.edges, highlight),
+        cage_lines: cage_lines(&cage.v, &model.edges),
+        curve_lines: curve_lines(&model.edges, highlight),
         cage_points: cage_points(&cage.v, highlight),
     }
 }
@@ -187,8 +192,8 @@ pub fn flat_surface(mesh: &TriMesh, tinted: &HashSet<usize>) -> SurfaceMesh {
     SurfaceMesh { vertices, indices }
 }
 
-/// ケージの辺を線分にする。辺モードで選択中の辺と、折れ目の辺は色を変える（選択の色を優先する）。
-pub fn cage_lines(vertices: &[Vec3], edges: &[Edge], highlight: &Highlight) -> Vec<LineVertex> {
+/// ケージの辺を線分にする。折れ目の辺は色を変える。
+pub fn cage_lines(vertices: &[Vec3], edges: &[Edge]) -> Vec<LineVertex> {
     let mut lines = Vec::with_capacity(edges.len() * 2);
     for edge in edges {
         let ends = (
@@ -198,6 +203,21 @@ pub fn cage_lines(vertices: &[Vec3], edges: &[Edge], highlight: &Highlight) -> V
         let (Some(a), Some(b)) = ends else {
             continue;
         };
+        let color = if edge.crease {
+            palette::CREASE_LINE
+        } else {
+            palette::CAGE_LINE
+        };
+        lines.push(LineVertex { position: a, color });
+        lines.push(LineVertex { position: b, color });
+    }
+    lines
+}
+
+/// 辺のベジェ曲線を `EDGE_SAMPLES` 分割した線分にする。辺モードで選択中の辺と、折れ目の辺は色を変える（選択の色を優先する）。
+pub fn curve_lines(edges: &[Edge], highlight: &Highlight) -> Vec<LineVertex> {
+    let mut lines = Vec::with_capacity(edges.len() * EDGE_SAMPLES * 2);
+    for edge in edges {
         let selected = highlight.mode == SelectMode::Edge
             && highlight.edges.contains(&EdgeKey::new(edge.a, edge.b));
         let color = if selected {
@@ -205,10 +225,23 @@ pub fn cage_lines(vertices: &[Vec3], edges: &[Edge], highlight: &Highlight) -> V
         } else if edge.crease {
             palette::CREASE_LINE
         } else {
-            palette::CAGE_LINE
+            palette::CURVE_LINE
         };
-        lines.push(LineVertex { position: a, color });
-        lines.push(LineVertex { position: b, color });
+        let points: Vec<Option<[f32; 3]>> = (0..=EDGE_SAMPLES)
+            .map(|i| to_finite_f32(bezier3(&edge.e, i as f64 / EDGE_SAMPLES as f64)))
+            .collect();
+        for pair in points.windows(2) {
+            if let [Some(a), Some(b)] = pair {
+                lines.push(LineVertex {
+                    position: *a,
+                    color,
+                });
+                lines.push(LineVertex {
+                    position: *b,
+                    color,
+                });
+            }
+        }
     }
     lines
 }

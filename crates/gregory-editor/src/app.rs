@@ -211,6 +211,7 @@ impl eframe::App for GregoryEditorApp {
                 revision: self.geometry.revision(),
                 show_surface: self.settings.show_surface,
                 show_cage: self.settings.show_cage,
+                show_curves: self.settings.show_curves,
                 message: message.as_deref(),
             };
             viewport::paint(

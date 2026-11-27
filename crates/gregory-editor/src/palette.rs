@@ -8,6 +8,8 @@ pub const VIEW_BACKGROUND: Color32 = Color32::from_rgb(0x13, 0x13, 0x13);
 /// 曲面の地の色（JS 試作のダーク表示と同じ）。
 pub const SURFACE_BASE: [f32; 3] = rgb(126, 170, 198);
 pub const CAGE_LINE: [f32; 3] = rgb(0x92, 0xa0, 0xac);
+/// 辺の曲線の色（JS 試作のダーク表示の `--curve`）。
+pub const CURVE_LINE: [f32; 3] = rgb(0xee, 0xf5, 0xf9);
 pub const CREASE_LINE: [f32; 3] = rgb(0xff, 0xb4, 0x8a);
 pub const CAGE_POINT: [f32; 3] = rgb(0xee, 0xf5, 0xf9);
 

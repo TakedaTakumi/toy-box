@@ -120,7 +120,7 @@ proptest! {
             .into_iter()
             .map(|(a, b, crease)| Edge { a, b, faces: vec![], e: [[0.0; 3]; 4], crease })
             .collect();
-        let lines = cage_lines(&v, &edges, &Highlight::default());
+        let lines = cage_lines(&v, &edges);
         prop_assert_eq!(lines.len() % 2, 0);
         let ok: Vec<&Edge> = edges
             .iter()
@@ -146,7 +146,7 @@ fn empty_inputs() {
     let m = TriMesh::default();
     assert!(smooth_surface(&m, &HashSet::new()).vertices.is_empty());
     assert!(flat_surface(&m, &HashSet::new()).indices.is_empty());
-    assert!(cage_lines(&[], &[], &Highlight::default()).is_empty());
+    assert!(cage_lines(&[], &[]).is_empty());
     assert!(cage_points(&[], &Highlight::default()).is_empty());
 }
 

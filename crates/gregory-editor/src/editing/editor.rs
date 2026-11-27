@@ -177,7 +177,7 @@ impl Editor {
 
     /// 移動ハンドルを押した。ハンドルの拘束で移動のドラッグに入る。
     pub fn press_handle(&mut self, view: &ScreenView, handle: Handle, pos: ScreenPos) {
-        if self.is_dragging() {
+        if self.is_dragging() || !pos.iter().all(|c| c.is_finite()) {
             return;
         }
         let mut session = MoveSession::new(
@@ -194,7 +194,10 @@ impl Editor {
 
     /// 要素を押した。選択を変え、軸の固定に従う移動のドラッグに入る。実在しない要素は無視する。
     pub fn press_element(&mut self, element: Element, additive: bool, pos: ScreenPos) {
-        if self.is_dragging() || !element.exists_in(&self.cage) {
+        if self.is_dragging()
+            || !pos.iter().all(|c| c.is_finite())
+            || !element.exists_in(&self.cage)
+        {
             return;
         }
         self.selection.press(element, additive);

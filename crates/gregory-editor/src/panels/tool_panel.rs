@@ -97,6 +97,7 @@ pub fn show(ui: &mut Ui, settings: &mut DisplaySettings, status: &EditStatus) ->
                 });
                 ui.checkbox(&mut settings.show_surface, "曲面");
                 ui.checkbox(&mut settings.show_cage, "ケージ");
+                ui.checkbox(&mut settings.show_curves, "ベジェ曲線");
                 let mut n = settings.subdivisions();
                 ui.add(Slider::new(&mut n, SUBDIVISION_RANGE).text("分割数"));
                 settings.set_subdivisions(n);

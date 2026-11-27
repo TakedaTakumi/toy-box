@@ -510,7 +510,6 @@ fn many_pushes_cap_the_history_at_the_limit() {
 }
 
 #[test]
-#[ignore = "既知の問題: 押した位置が非有限だと、回転量に NaN が返りクリック判定も効かなくなる"]
 fn orbit_delta_stays_finite_after_a_non_finite_press_position() {
     let view = view();
     let mut ed = Editor::default();

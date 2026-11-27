@@ -135,6 +135,7 @@ pub enum DragEnd {
 }
 
 impl Drag {
+    /// 押した位置が有限でないときは、最初に動いた有限の位置を起点にする。
     pub fn begin_orbit(pos: ScreenPos, clear_on_click: bool) -> Self {
         Self::Orbit(OrbitDrag {
             last: pos,
@@ -143,6 +144,7 @@ impl Drag {
         })
     }
 
+    /// 押した位置が有限でないときは、最初に動いた有限の位置を起点にする。
     pub fn begin_move(pos: ScreenPos, session: MoveSession) -> Self {
         Self::Move(MoveDrag {
             session,
@@ -171,18 +173,27 @@ impl Drag {
 
     /// ポインタが `pos` に動いた。有限でない位置は無視する。
     pub fn pointer_moved(&mut self, pos: ScreenPos) -> DragStep {
-        if !pos.iter().all(|c| c.is_finite()) {
+        if !is_finite(pos) {
             return DragStep::Nothing;
         }
         match self {
             Self::Idle => DragStep::Nothing,
             Self::Orbit(o) => {
+                if !is_finite(o.last) {
+                    o.last = pos;
+                    return DragStep::Nothing;
+                }
                 let (dx, dy) = (pos[0] - o.last[0], pos[1] - o.last[1]);
                 o.last = pos;
                 o.moved += dx.abs() + dy.abs();
                 DragStep::Orbit { dx, dy }
             }
             Self::Move(m) => {
+                if !is_finite(m.last) {
+                    m.last = pos;
+                    m.pos = pos;
+                    return DragStep::Nothing;
+                }
                 let (dx, dy) = (pos[0] - m.last[0], pos[1] - m.last[1]);
                 m.last = pos;
                 m.moved += dx.abs() + dy.abs();
@@ -219,4 +230,8 @@ impl Drag {
             _ => None,
         }
     }
+}
+
+fn is_finite(p: ScreenPos) -> bool {
+    p.iter().all(|c| c.is_finite())
 }

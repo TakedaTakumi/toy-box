@@ -55,6 +55,7 @@ pub struct ViewportContent<'a> {
     pub revision: u64,
     pub show_surface: bool,
     pub show_cage: bool,
+    pub show_curves: bool,
     /// 曲面を組み立てられなかったときなど、ビューに重ねて出す文。
     pub message: Option<&'a str>,
 }
@@ -232,6 +233,7 @@ pub fn paint(
                     visibility: Visibility {
                         surface: content.show_surface,
                         cage: content.show_cage,
+                        curves: content.show_curves,
                     },
                 },
             ));
