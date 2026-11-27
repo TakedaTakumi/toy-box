@@ -7,12 +7,13 @@ Gregory UI Sans は、HackGen（白源）v2.10.0 の標準版 Regular（`HackGen
 
 SIL Open Font License 1.1（OFL）に基づいて改変・再配布している。
 元フォントは Reserved Font Name（RFN）「白源」「HackGen」を持つため、改変版ではこれらの名前を使わず「Gregory UI Sans」に改名した。
+元フォントの著作権表示（nameID 0）には、Hack・源柔ゴシックのほか「[Nerd Fonts] Copyright (c) 2014, Ryan L McIntyre」が含まれる。上流の表記をそのまま残しており、Nerd Fonts のグリフを含むのは HackGen NF 版である。
 このフォントは上流の作者・配布元とは無関係であり、不具合は上流に問い合わせないこと。
 
 ### 改変内容
 
 - サブセット化：`subset-chars.txt` に列挙した文字（ASCII 印字可能文字、UI 用の記号、`gregory-editor` の `src/` と `index.html`、`gregory-core` の `mesh/presets.rs`・`error.rs`・`mesh/error.rs` に含まれる非 ASCII 文字）だけを残した。レイアウト機能とヒンティングは既定のまま。
-- 改名：name テーブルのうち、ファミリ名・フルネーム・PostScript 名・一意の ID など RFN を含むレコードを「Gregory UI Sans」系の名前に置き換えるか、削除した。著作権表示（nameID 0）とライセンス説明（nameID 13, 14）は元のまま残している。
+- 改名：name テーブルのうち、ファミリ名・フルネーム・PostScript 名・一意の ID など RFN を含むレコードを「Gregory UI Sans」系の名前に置き換えるか、削除した。著作権表示（nameID 0）は元のまま残す。元フォントには nameID 13・14（ライセンス説明）がないため、ライセンスは同梱の文書で示す。
 
 ### ライセンス
 

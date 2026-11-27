@@ -88,7 +88,7 @@ impl eframe::App for GregoryEditorApp {
             self.layout = PanelLayout::for_width(ctx.content_rect().width());
         }
         if self.layout.is_none() {
-            ctx.request_repaint();
+            ctx.request_repaint_after(std::time::Duration::from_millis(250));
         }
         let mut layout = self.layout.unwrap_or(PanelLayout {
             tools_open: false,

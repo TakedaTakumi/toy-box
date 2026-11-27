@@ -27,6 +27,7 @@
 
 - main へのpushで、`public/` をビルドして `gh-pages` ブランチへ出力する(`.github/workflows/deploy.yml`)
 - PRを開くと、そのPR専用のプレビューが `https://takedatakumi.github.io/toy-box/pr-preview/pr-<番号>/` に公開され、PRにURLがコメントされる。PRをクローズすると削除される(`.github/workflows/preview.yml`。フォークからのPRは対象外)
+- Trunk が取得する wasm-bindgen と wasm-opt の版は `crates/gregory-editor/Trunk.toml` の `[tools]` で固定している(wasm-bindgen は `Cargo.lock` と同じ版に揃える)
 - CIでは、Rust の検査(fmt・clippy・test)と Trunk のビルドも行う
 - `public/.nojekyll` は、Pagesのブランチ公開でJekyllが `README.md` を変換して、変換結果の `README.html` と衝突しないようにするためのもの
 

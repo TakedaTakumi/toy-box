@@ -14,8 +14,8 @@ pub fn show(ui: &mut Ui, stats: Option<SceneStats>, frame_ms: Option<f32>, gpu: 
             ui.label(format!("三角形 {}", stats.triangles));
         }
         match frame_ms {
-            Some(ms) => ui.label(format!("フレーム {ms:.1} ms")),
-            None => ui.label("フレーム - ms"),
+            Some(ms) => ui.label(format!("UI 処理 {ms:.1} ms")),
+            None => ui.label("UI 処理 - ms"),
         };
         match gpu {
             GpuStatus::Ready { backend } => ui.label(*backend),

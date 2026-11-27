@@ -32,6 +32,7 @@ mod web {
 
     const CANVAS_ID: &str = "the_canvas_id";
     const LOADING_ID: &str = "loading_text";
+    const PANIC_ID: &str = "panic_notice";
 
     pub fn start() {
         eframe::WebLogger::init(log::LevelFilter::Info).ok();
@@ -54,7 +55,9 @@ mod web {
                 depth_buffer: DEPTH_BUFFER_BITS,
                 ..Default::default()
             };
-            let result = eframe::WebRunner::new()
+            let runner = eframe::WebRunner::new();
+            install_panic_notice();
+            let result = runner
                 .start(
                     canvas,
                     options,
@@ -70,6 +73,35 @@ mod web {
                 Err(error) => show_failure(&document, &format!("{error:?}")),
             }
         });
+    }
+
+    /// 起動後の panic を画面に出す。eframe が入れたフックの後に呼ぶこと。
+    fn install_panic_notice() {
+        let previous = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            previous(info);
+            show_panic_notice();
+        }));
+    }
+
+    fn show_panic_notice() {
+        let Some(document) = web_sys::window().and_then(|w| w.document()) else {
+            return;
+        };
+        if document.get_element_by_id(PANIC_ID).is_some() {
+            return;
+        }
+        let (Ok(notice), Some(root)) = (document.create_element("p"), document.document_element())
+        else {
+            return;
+        };
+        notice.set_id(PANIC_ID);
+        notice.set_text_content(Some(
+            "エラーが起きました。ページを再読み込みしてください（詳細はコンソール）",
+        ));
+        let style = "position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);max-width:calc(100% - 32px);padding:12px 16px;background:#1b1b1b;color:#ff8080;border:1px solid #ff8080;font:14px/1.6 system-ui,sans-serif;text-align:center";
+        notice.set_attribute("style", style).ok();
+        root.append_child(&notice).ok();
     }
 
     /// 起動できなかった理由を、loading 表示の場所に出す。

@@ -98,7 +98,7 @@ pub fn backend_label(backend: wgpu::Backend, web: bool) -> &'static str {
     }
 }
 
-/// フレーム時間の指数移動平均。値が跳ねても読めるようにならす。
+/// UI 処理の CPU 時間（前フレーム分）の指数移動平均。値が跳ねても読めるようにならす。
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct FrameTimer {
     average_ms: Option<f32>,
@@ -107,7 +107,7 @@ pub struct FrameTimer {
 impl FrameTimer {
     const SMOOTHING: f32 = 0.1;
 
-    /// 1フレームの所要時間（秒）を足す。負・NaN・無限大は無視する。
+    /// 1フレームの UI 処理の CPU 時間（秒）を足す。負・NaN・無限大は無視する。
     pub fn record(&mut self, seconds: Option<f32>) {
         let Some(ms) = seconds
             .map(|s| s * 1000.0)

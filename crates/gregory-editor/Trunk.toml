@@ -3,3 +3,8 @@ target = "index.html"
 dist = "../../public/tools/gregory-modeler"
 filehash = false
 public_url = "./"
+
+# Trunk が取得するツールの版。wasm_bindgen は Cargo.lock の wasm-bindgen と同じにする
+[tools]
+wasm_bindgen = "0.2.130"
+wasm_opt = "version_131"

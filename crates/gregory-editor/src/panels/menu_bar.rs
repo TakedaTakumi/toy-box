@@ -28,6 +28,13 @@ pub fn show(ui: &mut Ui, settings: &mut DisplaySettings, layout: &mut PanelLayou
             ui.label(crate::APP_TITLE);
             ui.label(concat!("バージョン ", env!("CARGO_PKG_VERSION")));
             ui.weak("操作説明は、ツールパネルの「操作説明」にあります");
+            ui.separator();
+            ui.label("フォントのライセンス");
+            ui.weak("Gregory UI Sans（SIL OFL 1.1）");
+            ui.weak("文書：LICENSE、LICENSE_Hack、");
+            ui.weak("LICENSE_GenJyuuGothic");
+            #[cfg(target_arch = "wasm32")]
+            ui.hyperlink_to("LICENSE を開く", "fonts/LICENSE");
         });
     });
     actions
