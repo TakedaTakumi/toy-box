@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>グレゴリー曲面モデラ（Rust 版）</title>
+<style>
+  :root { color-scheme: light dark; --bg:#f4f6fb; --surface:#fff; --ink:#1c2438; --muted:#5d6a85; --line:#dde3ef; --accent:#4f6bed; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#11151f; --surface:#1a2030; --ink:#e8ecf6; --muted:#9aa6c0; --line:#2b3550; --accent:#8da2ff; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); line-height:1.8;
+    font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif; }
+  main { max-width: 52rem; margin: 0 auto; padding: 32px 16px 64px; }
+  nav a { color: var(--accent); }
+  article { margin-top: 16px; padding: 8px 24px 24px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow-wrap: anywhere; }
+  h1 { font-size: 1.6rem; }
+  h2 { margin-top: 2rem; padding-left: 12px; border-left: 4px solid var(--accent); font-size: 1.25rem; }
+  a { color: var(--accent); }
+  code { padding: 1px 5px; border-radius: 4px; background: var(--bg); font-size: .9em; }
+  pre { padding: 12px 16px; border-radius: 8px; background: var(--bg); overflow-x: auto; }
+  pre code { padding: 0; background: none; }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; }
+  th, td { padding: 6px 10px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+  th { background: var(--bg); }
+</style>
+</head>
+<body>
+<main>
+<nav><a href="../../">&larr; toy-box 一覧へ</a> / <a href="./">プロトタイプを開く</a></nav>
+<article>
+<h1>グレゴリー曲面モデラ（Rust 版）</h1>
+<p><a href="../gregory-mesh-editor/">グレゴリーメッシュエディタ試作</a>（JavaScript）の曲面の数学を Rust に移した <code>gregory-core</code> を使い、<strong>ケージから組み立てたグレゴリー曲面を GPU で描く</strong>ブラウザアプリです。この段階では表示と表示の設定だけを扱い、頂点の選択・移動・押し出しなどの編集はまだできません。</p>
+<ul>
+<li>成果物：WebAssembly（Rust + egui + wgpu）。WebGPU に対応したブラウザでは WebGPU、そうでなければ WebGL2 で描く</li>
+<li>デスクトップ版：<code>cargo run -p gregory-editor</code> でも同じ画面が開く</li>
+</ul>
+<h2>何を確かめるための段階か</h2>
+<div class="table-wrap"><table><thead><tr>
+<th>問い</th>
+<th>この段階での見せ方</th>
+</tr>
+</thead><tbody><tr>
+<td><code>gregory-core</code> の出力を、そのまま GPU で描けるか</td>
+<td>プリセットのケージから曲面を組み立て、深度バッファ付きで描く</td>
+</tr>
+<tr>
+<td>egui の画面構成で、JS 試作と同じ情報を出せるか</td>
+<td>左にツール、右に連続性の検証、下に頂点数やフレーム時間を出す</td>
+</tr>
+<tr>
+<td>WebGPU と WebGL2 の両方で同じ見た目になるか</td>
+<td>使っているバックエンドをステータスバーに出す</td>
+</tr>
+</tbody></table></div><h2>使い方</h2>
+<ol>
+<li>左のツールパネルの「形状」で、立方体・平面・四角錐・三角柱から選ぶ</li>
+<li>「表示」で、スムース／フラット、曲面とケージの表示、分割数を切り替える</li>
+<li>3D ビューをドラッグして回し、ホイール（またはピンチ）で拡大縮小する</li>
+<li>右のプロパティパネルで、G0・G1 の検証結果と形の数を確かめる</li>
+</ol>
+<h3>操作</h3>
+<div class="table-wrap"><table><thead><tr>
+<th>操作</th>
+<th>内容</th>
+</tr>
+</thead><tbody><tr>
+<td>ドラッグ</td>
+<td>視点を原点のまわりに回す（上下は ±約 83° まで）</td>
+</tr>
+<tr>
+<td>ホイール / ピンチ</td>
+<td>拡大縮小（カメラの距離 3〜16）</td>
+</tr>
+<tr>
+<td>ダブルクリック</td>
+<td>視点を初期位置に戻す（「視点をリセット」ボタン・「表示」メニューと同じ）</td>
+</tr>
+<tr>
+<td><code>S</code></td>
+<td>スムースとフラットの切り替え</td>
+</tr>
+<tr>
+<td>「表示」メニュー</td>
+<td>左右のパネルの開閉、表示の切り替え</td>
+</tr>
+</tbody></table></div><h2>機能仕様</h2>
+<div class="table-wrap"><table><thead><tr>
+<th>項目</th>
+<th>内容</th>
+</tr>
+</thead><tbody><tr>
+<td>プリセット</td>
+<td><code>gregory-core</code> の <code>PRESETS</code>（立方体・平面・四角錐・三角柱）。ハンドル長は 1、接線場は G1</td>
+</tr>
+<tr>
+<td>分割数</td>
+<td>4〜16（初期値 8）。範囲外の値は範囲に丸める</td>
+</tr>
+<tr>
+<td>スムース</td>
+<td><code>gregory-core</code> の頂点法線をピクセルごとに補間して光を当てる</td>
+</tr>
+<tr>
+<td>フラット</td>
+<td>細かい三角形ごとに頂点を分け、三角形の面法線で光を当てる</td>
+</tr>
+<tr>
+<td>光の当て方</td>
+<td>JS 試作と同じ（カメラから見て左上手前の平行光、環境光、弱いハイライト）。裏面も表と同じように照らす</td>
+</tr>
+<tr>
+<td>ケージ</td>
+<td>辺を線、頂点を小さな四角で描く。折れ目の辺は橙色。曲面に隠れる部分は隠れる</td>
+</tr>
+<tr>
+<td>連続性の検証</td>
+<td>G0 は共有辺の位置の最大の隙間、G1 は滑らかな共有辺の法線の最大差（度）。0.5° 未満を「G1 成立」とする（JS 試作と同じ）</td>
+</tr>
+<tr>
+<td>再計算</td>
+<td>プリセットか分割数が変わったときだけ曲面を組み立て直す。シェーディングの切り替えでは GPU に送る配列だけを作り直す</td>
+</tr>
+</tbody></table></div><h2>既知の制約</h2>
+<ul>
+<li>編集（選択、移動、押し出し、ループ分割、折れ目、ミラー、元に戻す）はまだない</li>
+<li>ハンドル長は 1 で固定。ベジェ曲線と制御点、座標軸、移動ハンドルは描かない</li>
+<li>線は 1 ピクセルの太さで、アンチエイリアスはかけない（MSAA を使わないため、曲面の輪郭もギザギザが出る）</li>
+<li>表示の設定は保存しない（ページを開き直すと初期状態に戻る）</li>
+<li>WebGPU と WebGL2 のどちらにも対応していないブラウザでは、起動できない旨を表示して止まる</li>
+</ul>
+<h2>実装メモ</h2>
+<div class="table-wrap"><table><thead><tr>
+<th>項目</th>
+<th>内容</th>
+</tr>
+</thead><tbody><tr>
+<td>構成</td>
+<td>Rust + egui 0.37（eframe）+ wgpu 30。曲面の数学は <code>crates/gregory-core</code></td>
+</tr>
+<tr>
+<td>描画</td>
+<td>egui の paint callback（<code>egui_wgpu::Callback</code>）の中で、自前の WGSL のパイプラインで描く。深度バッファは 24 ビット（<code>Depth24Plus</code>）、MSAA なし</td>
+</tr>
+<tr>
+<td>座標系</td>
+<td>右手系の Y-up。カメラの初期値と焦点距離（ビューの短い辺 × 1.55）は JS 試作と同じ</td>
+</tr>
+<tr>
+<td>画面</td>
+<td>egui 標準のダークテーマ。上にメニューバー、左にツール、中央に 3D ビュー、右にプロパティ、下にステータスバー。狭い画面では左右のパネルを閉じて始める</td>
+</tr>
+<tr>
+<td>フォント</td>
+<td>HackGen を改変した Gregory UI Sans（SIL Open Font License 1.1）。UI で使う文字だけに絞っている</td>
+</tr>
+<tr>
+<td>ビルド</td>
+<td><code>crates/gregory-editor</code> で <code>trunk build --release</code>。出力先は <code>public/tools/gregory-modeler/</code>（生成物のため Git では追跡しない）</td>
+</tr>
+</tbody></table></div><h2>ファイル構成</h2>
+<pre><code>crates/gregory-editor/
+├─ Cargo.toml
+├─ Trunk.toml           # trunk の設定（出力先など）
+├─ index.html           # trunk の入力（canvas と読み込み中の表示）
+├─ README.md            # このページ
+├─ assets/fonts/        # UI のフォントとライセンス
+└─ src/
+   ├─ main.rs           # ネイティブと web の起動
+   ├─ lib.rs
+   ├─ app.rs            # アプリの状態と 1 フレームの処理
+   ├─ settings.rs       # 表示の設定
+   ├─ scene.rs          # プリセットから曲面を組み立てる
+   ├─ memo.rs           # 入力が変わったときだけ計算し直す入れ物
+   ├─ mesh_buffers.rs   # GPU に送る頂点・インデックス・線分・点の配列
+   ├─ camera.rs         # オービットカメラと変換行列
+   ├─ readouts.rs       # 検証結果・数・バックエンド名の表示用の値
+   ├─ palette.rs        # 3D ビューの色
+   ├─ fonts.rs          # フォントの登録
+   ├─ panels/           # メニューバー・ツール・プロパティ・ステータスバー
+   └─ viewport/         # 3D ビューの入力、wgpu の資源、WGSL シェーダ
+</code></pre>
+
+</article>
+</main>
+</body>
+</html>
