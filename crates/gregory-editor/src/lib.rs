@@ -1,0 +1,19 @@
+//! グレゴリー曲面モデラの表示アプリ。gregory-core の曲面とケージを egui + wgpu で描く。
+
+mod app;
+pub mod camera;
+mod fonts;
+pub mod memo;
+pub mod mesh_buffers;
+pub mod palette;
+mod panels;
+pub mod readouts;
+pub mod scene;
+pub mod settings;
+mod viewport;
+
+pub use app::GregoryEditorApp;
+pub use viewport::DEPTH_BUFFER_BITS;
+
+/// ウィンドウとページのタイトル。
+pub const APP_TITLE: &str = "グレゴリー曲面モデラ（Rust 版）";

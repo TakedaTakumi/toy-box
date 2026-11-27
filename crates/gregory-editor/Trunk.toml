@@ -1,0 +1,5 @@
+[build]
+target = "index.html"
+dist = "../../public/tools/gregory-modeler"
+filehash = false
+public_url = "./"
