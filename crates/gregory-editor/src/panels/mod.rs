@@ -5,6 +5,8 @@ pub mod properties_panel;
 pub mod status_bar;
 pub mod tool_panel;
 
+use crate::editing::EditAction;
+
 /// 左右のパネルの開閉。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PanelLayout {
@@ -54,10 +56,13 @@ pub fn panel_heading(ui: &mut egui::Ui, text: &str) {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct PanelActions {
     pub reset_camera: bool,
+    /// 編集の操作（1フレームに1つまで。複数あれば先のものを使う）。
+    pub edit: Option<EditAction>,
 }
 
 impl PanelActions {
     pub fn merge(&mut self, other: Self) {
         self.reset_camera |= other.reset_camera;
+        self.edit = self.edit.or(other.edit);
     }
 }

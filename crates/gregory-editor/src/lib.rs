@@ -2,6 +2,7 @@
 
 mod app;
 pub mod camera;
+pub mod editing;
 mod fonts;
 pub mod memo;
 pub mod mesh_buffers;
@@ -10,6 +11,7 @@ pub mod panels;
 pub mod readouts;
 pub mod scene;
 pub mod settings;
+pub mod shortcuts;
 mod viewport;
 
 pub use app::GregoryEditorApp;

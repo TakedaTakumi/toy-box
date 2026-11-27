@@ -16,6 +16,8 @@ pub struct Uniforms {
     pub up: [f32; 4],
     pub forward: [f32; 4],
     pub surface_color: [f32; 4],
+    /// 選択中の面に混ぜる色（rgb）と、その割合（a）。
+    pub highlight_color: [f32; 4],
     pub params: [f32; 4],
 }
 
@@ -147,7 +149,8 @@ impl SceneRenderer {
             depth_format,
         };
 
-        let surface_attributes = wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3];
+        let surface_attributes =
+            wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3, 2 => Float32];
         let surface_pipeline = factory.create(&PipelineSpec {
             label: "gregory_surface",
             vertex_entry: "vs_surface",
@@ -173,7 +176,8 @@ impl SceneRenderer {
             },
             always_on_top: true,
         });
-        let point_attributes = wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3];
+        let point_attributes =
+            wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3, 2 => Float32];
         let point_pipeline = factory.create(&PipelineSpec {
             label: "gregory_cage_points",
             vertex_entry: "vs_point",

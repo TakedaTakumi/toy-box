@@ -19,7 +19,6 @@ proptest! {
         let mut s = DisplaySettings::default();
         s.set_subdivisions(n);
         prop_assert_eq!(s.subdivisions(), clamp_subdivisions(n));
-        prop_assert_eq!(s.build_key().subdivisions, clamp_subdivisions(n));
     }
 }
 

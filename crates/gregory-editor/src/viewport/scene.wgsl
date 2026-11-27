@@ -5,7 +5,9 @@ struct Uniforms {
     up: vec4<f32>,
     forward: vec4<f32>,
     surface_color: vec4<f32>,
-    // x, y: ビューの大きさ（ピクセル）、z: 点の一辺（ピクセル）、w: 出力先が sRGB なら 1
+    // rgb: 選択中の面に混ぜる色、a: 混ぜる割合
+    highlight_color: vec4<f32>,
+    // x, y: ビューの大きさ（ピクセル）、z: 1 ポイントのピクセル数、w: 出力先が sRGB なら 1
     params: vec4<f32>,
 };
 
@@ -31,15 +33,27 @@ struct SurfaceOut {
     @builtin(position) clip: vec4<f32>,
     @location(0) world: vec3<f32>,
     @location(1) normal: vec3<f32>,
+    @location(2) tint: f32,
 };
 
 @vertex
-fn vs_surface(@location(0) position: vec3<f32>, @location(1) normal: vec3<f32>) -> SurfaceOut {
+fn vs_surface(
+    @location(0) position: vec3<f32>,
+    @location(1) normal: vec3<f32>,
+    @location(2) tint: f32,
+) -> SurfaceOut {
     var out: SurfaceOut;
     out.clip = u.view_proj * vec4<f32>(position, 1.0);
     out.world = position;
     out.normal = normal;
+    out.tint = tint;
     return out;
+}
+
+// JS 試作と同じく、光を当てた後の色に選択の色を混ぜる
+fn tinted(c: vec3<f32>, tint: f32) -> vec3<f32> {
+    let k = clamp(tint, 0.0, 1.0) * u.highlight_color.a;
+    return mix(clamp(c, vec3<f32>(0.0), vec3<f32>(1.0)), u.highlight_color.rgb, k);
 }
 
 @fragment
@@ -52,7 +66,7 @@ fn fs_surface(in: SurfaceOut) -> @location(0) vec4<f32> {
     let len = length(in.normal);
     let base = u.surface_color.rgb;
     if (len < 1e-9) {
-        return to_output(base * 0.3);
+        return to_output(tinted(base * 0.3, in.tint));
     }
     var n = in.normal / len;
     if (dot(n, geometric) < 0.0) {
@@ -64,7 +78,7 @@ fn fs_surface(in: SurfaceOut) -> @location(0) vec4<f32> {
     let half_dir = normalize(light - vec3<f32>(0.0, 0.0, 1.0));
     let diffuse = 0.3 + 0.1 * v.y + 0.68 * max(0.0, dot(v, light));
     let spec = 0.22 * pow(max(0.0, dot(v, half_dir)), 28.0);
-    return to_output(base * diffuse + vec3<f32>(spec));
+    return to_output(tinted(base * diffuse + vec3<f32>(spec), in.tint));
 }
 
 // ---- ケージの線 ----
@@ -89,6 +103,7 @@ fn vs_point(
     @builtin(vertex_index) corner: u32,
     @location(0) position: vec3<f32>,
     @location(1) color: vec3<f32>,
+    @location(2) size: f32,
 ) -> ColorOut {
     var offsets = array<vec2<f32>, 6>(
         vec2<f32>(-0.5, -0.5),
@@ -100,7 +115,7 @@ fn vs_point(
     );
     var clip = u.view_proj * vec4<f32>(position, 1.0);
     let viewport = max(u.params.xy, vec2<f32>(1.0));
-    clip = vec4<f32>(clip.xy + offsets[corner % 6u] * u.params.z * 2.0 / viewport * clip.w, clip.zw);
+    clip = vec4<f32>(clip.xy + offsets[corner % 6u] * size * u.params.z * 2.0 / viewport * clip.w, clip.zw);
     var out: ColorOut;
     out.clip = clip;
     out.color = color;
