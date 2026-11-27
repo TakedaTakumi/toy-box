@@ -48,7 +48,7 @@
 </tr>
 <tr>
 <td>egui の画面構成で、JS 試作と同じ情報を出せるか</td>
-<td>左にツール、右に連続性の検証、下に頂点数やフレーム時間を出す</td>
+<td>左にツール、右に連続性の検証、下に頂点数や UI 処理の CPU 時間（前フレーム分。GPU 時間は含まない）を出す</td>
 </tr>
 <tr>
 <td>WebGPU と WebGL2 の両方で同じ見た目になるか</td>
@@ -113,7 +113,7 @@
 </tr>
 <tr>
 <td>ケージ</td>
-<td>辺を線、頂点を小さな四角で描く。折れ目の辺は橙色。曲面に隠れる部分は隠れる</td>
+<td>辺を線、頂点を小さな四角で描く。折れ目の辺は橙色。線と点は常に曲面の手前に重ねて描く</td>
 </tr>
 <tr>
 <td>連続性の検証</td>
@@ -127,9 +127,21 @@
 <ul>
 <li>編集（選択、移動、押し出し、ループ分割、折れ目、ミラー、元に戻す）はまだない</li>
 <li>ハンドル長は 1 で固定。ベジェ曲線と制御点、座標軸、移動ハンドルは描かない</li>
+<li>ケージの線と点は常に曲面の手前に重ねて描き、裏向きの頂点・辺を隠す処理は未対応</li>
 <li>線は 1 ピクセルの太さで、アンチエイリアスはかけない（MSAA を使わないため、曲面の輪郭もギザギザが出る）</li>
 <li>表示の設定は保存しない（ページを開き直すと初期状態に戻る）</li>
-<li>WebGPU と WebGL2 のどちらにも対応していないブラウザでは、起動できない旨を表示して止まる</li>
+<li>WebGPU と WebGL2 のどちらにも対応していないブラウザでは、起動時に失敗した旨を表示して止まる。起動後に Rust 側で panic したときは、再読み込みを促す表示を出す。wasm の取得・初期化そのものに失敗した場合は、20 秒たっても読み込み中の表示が消えなければ、失敗した可能性を案内する</li>
+</ul>
+<h2>ライセンス</h2>
+<ul>
+<li>フォント Gregory UI Sans は、HackGen v2.10.0（Regular）を改変（サブセット化と改名）したもので、SIL Open Font License 1.1 で配布する</li>
+<li>由来は Hack（MIT）と源柔ゴシック（SIL OFL 1.1）。ライセンス文書は、このページと同じ公開フォルダの <code>fonts/</code> に置いている<ul>
+<li><a href="fonts/LICENSE">LICENSE</a>：HackGen 本体（OFL 1.1）</li>
+<li><a href="fonts/LICENSE_Hack">LICENSE_Hack</a>：Hack（MIT）</li>
+<li><a href="fonts/LICENSE_GenJyuuGothic">LICENSE_GenJyuuGothic</a>：源柔ゴシック（OFL 1.1）</li>
+</ul>
+</li>
+<li>アプリの「ヘルプ」メニューにも、同じ内容を出している</li>
 </ul>
 <h2>実装メモ</h2>
 <div class="table-wrap"><table><thead><tr>
@@ -166,7 +178,7 @@
 ├─ Trunk.toml           # trunk の設定（出力先など）
 ├─ index.html           # trunk の入力（canvas と読み込み中の表示）
 ├─ README.md            # このページ
-├─ assets/fonts/        # UI のフォントとライセンス
+├─ assets/fonts/        # UI のフォントとライセンス（LICENSE 類は fonts/ に公開する）
 └─ src/
    ├─ main.rs           # ネイティブと web の起動
    ├─ lib.rs

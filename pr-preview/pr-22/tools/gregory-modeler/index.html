@@ -21,6 +21,9 @@ dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
 
 </script>
 
+
+
+
 <style>
   html, body {
     margin: 0;
@@ -50,9 +53,18 @@ dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
     text-align: center;
   }
 </style>
-<link rel="modulepreload" href="./gregory-editor.js" crossorigin="anonymous" integrity="sha384-nQ+0IBP6vnXQtNHP5X8f44+WygHGll9TUVGNwvNX2t9gDFe1UtAYrvY/qffxmFFs"><link rel="preload" href="./gregory-editor_bg.wasm" crossorigin="anonymous" integrity="sha384-bDiV5XDytdLz0Iel8w1UA/3lSjN2dIrlXgui2npxhXep6zljlLcsiVF1hEPQJWha" as="fetch" type="application/wasm"></head>
+<link rel="modulepreload" href="./gregory-editor.js" crossorigin="anonymous" integrity="sha384-QzyCNdjMptoQCrOFbPsUsu8ErT7H9CebzAj0kFUoZro86HxXBzitCmRuyLaOqvVO"><link rel="preload" href="./gregory-editor_bg.wasm" crossorigin="anonymous" integrity="sha384-WgqtHNyrU8EGIlvq9oy6UKctum4FuAzlu0RLjJvpobyhYiFB4a72YQQVUDtJ6AG5" as="fetch" type="application/wasm"></head>
 <body>
 <canvas id="the_canvas_id"></canvas>
 <p id="loading_text">読み込み中…</p>
+<script>
+  // wasm の取得・初期化に失敗すると loading 表示が残り続けるため、一定時間後に案内を足す
+  setTimeout(function () {
+    var el = document.getElementById("loading_text");
+    if (el) {
+      el.textContent = "読み込みに失敗したか、時間がかかっています。ページを再読み込みしてください（詳細はコンソール）";
+    }
+  }, 20000);
+</script>
 </body>
 </html>
