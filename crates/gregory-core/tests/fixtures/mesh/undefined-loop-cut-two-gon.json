@@ -1,0 +1,1 @@
+{"name":"undefined-loop-cut-two-gon","op":"loop_cut","input":{"model":{"v":[[0,0,0],[1,0,0],[0,0,-1]],"f":[[0,1,2],[0,1]],"creases":[]},"edge_keys":[[0,1]],"mid_of":null},"undefined_output":true}

@@ -1,0 +1,1 @@
+{"name":"compact-no-faces","op":"compact","input":{"model":{"v":[[-1,-1,1],[1,-1,1],[1,-1,-1],[-1,-1,-1],[-1,1,1],[1,1,1],[1,1,-1],[-1,1,-1]],"f":[],"creases":[[0,1]]}},"output":{"model":{"v":[],"f":[],"creases":[]},"remap":[null,null,null,null,null,null,null,null]}}

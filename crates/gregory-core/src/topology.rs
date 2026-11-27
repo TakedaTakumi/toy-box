@@ -52,14 +52,23 @@ pub struct Edge {
     pub crease: bool,
 }
 
-pub(crate) struct EdgeEntry {
+/// 辺の表の1行。`faces` は、その辺を持つ面の角を、初出の順に並べたもの（同じ面に2回現れる辺では、その面が2回入る）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EdgeEntry {
     pub a: usize,
     pub b: usize,
     pub faces: Vec<FaceCorner>,
 }
 
-/// 辺ごとに、その辺を持つ面の角を、初出の順に並べた表。
-pub(crate) struct EdgeMap {
+impl EdgeEntry {
+    pub fn key(&self) -> EdgeKey {
+        EdgeKey::new(self.a, self.b)
+    }
+}
+
+/// 辺ごとに、その辺を持つ面の角を、初出の順に並べた表（JS の `edgeMap`）。
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct EdgeMap {
     entries: Vec<EdgeEntry>,
     index: HashMap<EdgeKey, usize>,
 }
@@ -87,12 +96,31 @@ impl EdgeMap {
     }
 
     pub fn get(&self, x: usize, y: usize) -> Option<&EdgeEntry> {
-        self.index
-            .get(&EdgeKey::new(x, y))
-            .map(|&i| &self.entries[i])
+        self.lookup(EdgeKey::new(x, y))
     }
 
+    pub fn lookup(&self, key: EdgeKey) -> Option<&EdgeEntry> {
+        self.index.get(&key).map(|&i| &self.entries[i])
+    }
+
+    pub fn contains(&self, key: EdgeKey) -> bool {
+        self.index.contains_key(&key)
+    }
+
+    /// 初出の順（JS の `Map` の反復順）。
     pub fn entries(&self) -> &[EdgeEntry] {
         &self.entries
+    }
+
+    pub fn keys(&self) -> impl Iterator<Item = EdgeKey> + '_ {
+        self.entries.iter().map(EdgeEntry::key)
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
     }
 }

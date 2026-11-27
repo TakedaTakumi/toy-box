@@ -67,3 +67,24 @@ pub(crate) fn js_min(a: f64, b: f64) -> f64 {
         a
     }
 }
+
+/// Math.round と同じく、ちょうど半分は +∞ 側に丸め、-0.5 以上の負数は -0 にする。
+pub(crate) fn js_round(x: f64) -> f64 {
+    if !x.is_finite() || x == 0.0 {
+        return x;
+    }
+    let floor = x.floor();
+    let r = if x - floor >= 0.5 { floor + 1.0 } else { floor };
+    if r == 0.0 && x < 0.0 { -0.0 } else { r }
+}
+
+/// Math.sign と同じく、NaN と ±0 はそのまま返す。
+pub(crate) fn js_sign(x: f64) -> f64 {
+    if x.is_nan() || x == 0.0 {
+        x
+    } else if x > 0.0 {
+        1.0
+    } else {
+        -1.0
+    }
+}

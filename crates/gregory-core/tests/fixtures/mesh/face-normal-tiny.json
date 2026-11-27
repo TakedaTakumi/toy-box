@@ -1,0 +1,1 @@
+{"name":"face-normal-tiny","op":"face_normal","input":{"v":[[0,0,0],[1e-7,0,0],[0,0,-1e-7]],"f":[0,1,2]},"output":[0,0,0]}
