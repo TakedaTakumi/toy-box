@@ -980,6 +980,7 @@ dependencies = [
  "egui-wgpu",
  "gregory-core",
  "log",
+ "proptest",
  "wasm-bindgen-futures",
  "web-sys",
  "wgpu",
