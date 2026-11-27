@@ -13,6 +13,8 @@
 - `public/<カテゴリ>/<プロトタイプ名>/README.md` : 各プロトタイプのドキュメント。デプロイ時に `README.html` へ変換して公開する
 - `scripts/build-docs.mjs` : README.md を HTML に変換するスクリプト(`npm ci && npm run build:docs` でローカルでも確認できる。生成物はコミットしない)
 - `tests/` : 切り出した処理のテスト(`npm test`。デプロイ前にCIでも実行する)
+- `Cargo.toml` / `crates/` : Rust のワークスペース。`crates/gregory-editor` は Trunk で `public/tools/gregory-modeler/` に出力する(出力はコミットしない)
+- Rust のローカル確認: `cargo test --workspace`、`cd crates/gregory-editor && trunk serve`(または `trunk build --release`)
 - カテゴリ: `games`(ゲーム) / `tools`(可視化・学習ツール) / `art`(アート・演出)
 
 ## プロトタイプの追加
@@ -25,6 +27,7 @@
 
 - main へのpushで、`public/` をビルドして `gh-pages` ブランチへ出力する(`.github/workflows/deploy.yml`)
 - PRを開くと、そのPR専用のプレビューが `https://takedatakumi.github.io/toy-box/pr-preview/pr-<番号>/` に公開され、PRにURLがコメントされる。PRをクローズすると削除される(`.github/workflows/preview.yml`。フォークからのPRは対象外)
+- CIでは、Rust の検査(fmt・clippy・test)と Trunk のビルドも行う
 - `public/.nojekyll` は、Pagesのブランチ公開でJekyllが `README.md` を変換して、変換結果の `README.html` と衝突しないようにするためのもの
 
 ## 初回設定

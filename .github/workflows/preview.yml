@@ -10,6 +10,9 @@ permissions:
 
 concurrency: preview-${{ github.ref }}
 
+env:
+  TRUNK_VERSION: 0.22.2
+
 jobs:
   preview:
     # フォークからのPRは、書き込み権限がないため対象外
@@ -41,6 +44,26 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: Install Trunk
+        if: github.event.action != 'closed'
+        run: |
+          base="https://github.com/trunk-rs/trunk/releases/download/v${TRUNK_VERSION}"
+          archive="trunk-x86_64-unknown-linux-gnu.tar.gz"
+          cd "$RUNNER_TEMP"
+          curl -fsSL -O "${base}/${archive}"
+          curl -fsSL -O "${base}/${archive}.sha256"
+          echo "$(cat "${archive}.sha256")  ${archive}" | sha256sum -c -
+          mkdir -p trunk-bin
+          tar -xzf "${archive}" -C trunk-bin
+          echo "$RUNNER_TEMP/trunk-bin" >> "$GITHUB_PATH"
+      - uses: actions/cache@v4
+        if: github.event.action != 'closed'
+        with:
+          path: ~/.cache/trunk
+          key: ${{ runner.os }}-trunk-${{ env.TRUNK_VERSION }}-${{ hashFiles('**/Cargo.lock') }}
+      - if: github.event.action != 'closed'
+        run: trunk build --release
+        working-directory: crates/gregory-editor
       - if: github.event.action != 'closed'
         run: |
           npm ci
