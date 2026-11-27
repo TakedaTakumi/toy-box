@@ -981,6 +981,7 @@ dependencies = [
  "gregory-core",
  "log",
  "proptest",
+ "skrifa",
  "wasm-bindgen-futures",
  "web-sys",
  "wgpu",

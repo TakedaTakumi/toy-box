@@ -24,6 +24,8 @@ web-sys = { version = "0.3", features = ["Document", "Element", "HtmlCanvasEleme
 
 [dev-dependencies]
 proptest = { workspace = true }
+# サブセットフォントの cmap 検査用（egui が使うフォント解析と同系統）
+skrifa = { version = "0.44", default-features = false }
 
 [lints]
 workspace = true
