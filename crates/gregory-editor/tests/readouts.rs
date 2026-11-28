@@ -2,7 +2,7 @@ use gregory_core::{ContinuityCheck, Preset};
 use gregory_editor::readouts::{
     FrameTimer, G1Verdict, SceneStats, backend_label, format_g0, format_g1, g1_verdict,
 };
-use gregory_editor::scene::{BuildKey, build_scene};
+use gregory_editor::scene::build_scene;
 use proptest::prelude::*;
 
 fn check(g1: f64, pairs: usize) -> ContinuityCheck {
@@ -119,11 +119,7 @@ fn backend_labels() {
 
 #[test]
 fn cube_stats() {
-    let scene = build_scene(&BuildKey {
-        preset: Preset::Cube,
-        subdivisions: 8,
-    })
-    .unwrap();
+    let scene = build_scene(&Preset::Cube.make(), 8).unwrap();
     let s = SceneStats::of(&scene);
     assert_eq!((s.vertices, s.faces, s.edges), (8, 6, 12));
     assert_eq!((s.patches, s.quads, s.tris), (6, 6, 0));

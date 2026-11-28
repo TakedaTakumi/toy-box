@@ -1,13 +1,43 @@
 //! 上のメニューバー。
 
-use egui::Ui;
+use egui::{Button, Ui};
 
 use super::{PanelActions, PanelLayout};
+use crate::editing::{EditAction, EditStatus};
 use crate::settings::{DisplaySettings, Shading};
 
-pub fn show(ui: &mut Ui, settings: &mut DisplaySettings, layout: &mut PanelLayout) -> PanelActions {
+pub fn show(
+    ui: &mut Ui,
+    settings: &mut DisplaySettings,
+    layout: &mut PanelLayout,
+    status: &EditStatus,
+) -> PanelActions {
     let mut actions = PanelActions::default();
     egui::MenuBar::new().ui(ui, |ui| {
+        ui.menu_button("編集", |ui| {
+            let editable = !status.dragging;
+            let items = [
+                ("元に戻す", "Ctrl+Z", status.can_undo, EditAction::Undo),
+                (
+                    "やり直し",
+                    "Ctrl+Shift+Z",
+                    status.can_redo,
+                    EditAction::Redo,
+                ),
+                ("全選択", "Ctrl+A", true, EditAction::SelectAll),
+                ("選択解除", "Esc", true, EditAction::ClearSelection),
+            ];
+            for (i, (label, keys, enabled, action)) in items.into_iter().enumerate() {
+                if i == 2 {
+                    ui.separator();
+                }
+                let button = Button::new(label).shortcut_text(keys);
+                if ui.add_enabled(editable && enabled, button).clicked() {
+                    actions.edit = Some(action);
+                    ui.close();
+                }
+            }
+        });
         ui.menu_button("表示", |ui| {
             ui.checkbox(&mut layout.tools_open, "ツールパネル");
             ui.checkbox(&mut layout.properties_open, "プロパティパネル");
@@ -18,6 +48,7 @@ pub fn show(ui: &mut Ui, settings: &mut DisplaySettings, layout: &mut PanelLayou
             ui.separator();
             ui.checkbox(&mut settings.show_surface, "曲面");
             ui.checkbox(&mut settings.show_cage, "ケージ");
+            ui.checkbox(&mut settings.show_curves, "ベジェ曲線");
             ui.separator();
             if ui.button("視点をリセット").clicked() {
                 actions.reset_camera = true;

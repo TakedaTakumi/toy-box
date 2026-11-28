@@ -2,12 +2,23 @@
 
 use egui::Ui;
 
-use crate::readouts::SceneStats;
+use crate::editing::EditStatus;
+use crate::readouts::{SceneStats, selection_summary};
 use crate::viewport::GpuStatus;
 
-pub fn show(ui: &mut Ui, stats: Option<SceneStats>, frame_ms: Option<f32>, gpu: &GpuStatus) {
+pub fn show(
+    ui: &mut Ui,
+    status: &EditStatus,
+    stats: Option<SceneStats>,
+    frame_ms: Option<f32>,
+    gpu: &GpuStatus,
+) {
     ui.horizontal_wrapped(|ui| {
         ui.spacing_mut().item_spacing.x = 14.0;
+        ui.label(selection_summary(status.mode, status.selected));
+        if let Some(axis) = status.axis_lock {
+            ui.label(format!("{} 軸に固定", axis.label()));
+        }
         if let Some(stats) = stats {
             ui.label(format!("頂点 {}", stats.vertices));
             ui.label(format!("面 {}", stats.faces));

@@ -1,6 +1,6 @@
 //! 原点を中心に回るカメラ（JS 試作と同じ角度・距離・焦点距離）。座標系は右手系の Y-up。
 
-use gregory_core::{Vec3, cross, dot, mul, norm};
+use gregory_core::{Vec3, add, cross, dot, mul, norm, sub};
 
 const DEFAULT_YAW: f64 = 0.75;
 const DEFAULT_PITCH: f64 = 0.45;
@@ -13,7 +13,8 @@ pub const MAX_DISTANCE: f64 = 16.0;
 const ORBIT_RADIANS_PER_POINT: f64 = 0.008;
 /// 焦点距離を、ビューの短い辺に対する比で表す（JS 試作の `min(W, H) * 1.55`）。
 const FOCAL_SCALE: f64 = 1.55;
-const NEAR: f64 = 0.1;
+/// これより手前（カメラからの奥行き）は描かず、画面への射影もしない。
+pub const NEAR: f64 = 0.1;
 const FAR: f64 = 100.0;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -98,7 +99,8 @@ impl OrbitCamera {
     }
 }
 
-pub fn view_projection(frame: &CameraFrame, width: f32, height: f32) -> [[f32; 4]; 4] {
+/// ビューの大きさ。0 以下・非有限の値は 1 にする。
+fn view_size(width: f32, height: f32) -> (f64, f64) {
     let positive = |x: f32| {
         if x.is_finite() && x > 0.0 {
             f64::from(x)
@@ -106,8 +108,17 @@ pub fn view_projection(frame: &CameraFrame, width: f32, height: f32) -> [[f32; 4
             1.0
         }
     };
-    let (w, h) = (positive(width), positive(height));
-    let focal = 2.0 * FOCAL_SCALE * w.min(h);
+    (positive(width), positive(height))
+}
+
+/// 焦点距離（ビューと同じ単位）。
+fn focal_length(w: f64, h: f64) -> f64 {
+    FOCAL_SCALE * w.min(h)
+}
+
+pub fn view_projection(frame: &CameraFrame, width: f32, height: f32) -> [[f32; 4]; 4] {
+    let (w, h) = view_size(width, height);
+    let focal = 2.0 * focal_length(w, h);
     let (sx, sy) = (focal / w, focal / h);
     let CameraFrame {
         eye,
@@ -124,4 +135,105 @@ pub fn view_projection(frame: &CameraFrame, width: f32, height: f32) -> [[f32; 4
         [f[0], f[1], f[2], -dot(f, eye)],
     ];
     std::array::from_fn(|col| std::array::from_fn(|row| rows[row][col] as f32))
+}
+
+/// 画面上の位置（ビューの左上が原点で右・下が正）と、カメラからの奥行き。
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Projected {
+    pub x: f64,
+    pub y: f64,
+    pub depth: f64,
+}
+
+impl Projected {
+    pub fn xy(&self) -> [f64; 2] {
+        [self.x, self.y]
+    }
+}
+
+/// 視線。`dir` は視線方向の成分が 1 になるように取るので、`at(t)` の奥行きは `t` になる。
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Ray {
+    pub origin: Vec3,
+    pub dir: Vec3,
+}
+
+impl Ray {
+    pub fn at(&self, t: f64) -> Vec3 {
+        add(self.origin, mul(self.dir, t))
+    }
+}
+
+/// 3D 空間と画面の対応。`view_projection` と同じ射影を、ビューの単位（egui のポイントなど）で表す。
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ScreenView {
+    frame: CameraFrame,
+    width: f64,
+    height: f64,
+    focal: f64,
+}
+
+impl ScreenView {
+    pub fn new(frame: CameraFrame, width: f32, height: f32) -> Self {
+        let (w, h) = view_size(width, height);
+        Self {
+            frame,
+            width: w,
+            height: h,
+            focal: focal_length(w, h),
+        }
+    }
+
+    pub fn of(camera: &OrbitCamera, width: f32, height: f32) -> Self {
+        Self::new(camera.frame(), width, height)
+    }
+
+    pub fn frame(&self) -> &CameraFrame {
+        &self.frame
+    }
+
+    pub fn size(&self) -> [f64; 2] {
+        [self.width, self.height]
+    }
+
+    pub fn focal(&self) -> f64 {
+        self.focal
+    }
+
+    /// カメラからの奥行き（視線方向の距離）。
+    pub fn depth(&self, p: Vec3) -> f64 {
+        dot(sub(p, self.frame.eye), self.frame.forward)
+    }
+
+    /// 画面に射影する。奥行きが `NEAR` 未満の点と、結果が有限でない点は `None`。
+    pub fn project(&self, p: Vec3) -> Option<Projected> {
+        let d = sub(p, self.frame.eye);
+        let depth = dot(d, self.frame.forward);
+        if depth.is_nan() || depth < NEAR {
+            return None;
+        }
+        let k = self.focal / depth;
+        let x = self.width / 2.0 + dot(d, self.frame.right) * k;
+        let y = self.height / 2.0 - dot(d, self.frame.up) * k;
+        (x.is_finite() && y.is_finite() && depth.is_finite()).then_some(Projected { x, y, depth })
+    }
+
+    /// 画面上の位置を通る視線。位置が有限でなければ `None`。
+    pub fn ray(&self, x: f64, y: f64) -> Option<Ray> {
+        if !x.is_finite() || !y.is_finite() {
+            return None;
+        }
+        let a = (x - self.width / 2.0) / self.focal;
+        let b = -(y - self.height / 2.0) / self.focal;
+        let CameraFrame {
+            eye,
+            right,
+            up,
+            forward,
+        } = self.frame;
+        let dir = add(forward, add(mul(right, a), mul(up, b)));
+        dir.iter()
+            .all(|c| c.is_finite())
+            .then_some(Ray { origin: eye, dir })
+    }
 }

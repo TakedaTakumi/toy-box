@@ -3,13 +3,35 @@
 use egui::{CollapsingHeader, Grid, RichText, Ui};
 use gregory_core::GregoryError;
 
+use crate::editing::EditStatus;
+use crate::editing::selection::mode_label;
 use crate::palette;
-use crate::readouts::{G1Verdict, SceneStats, format_g0, format_g1, g1_verdict};
+use crate::readouts::{G1Verdict, SceneStats, format_g0, format_g1, format_position, g1_verdict};
 use crate::scene::Scene;
 
-pub fn show(ui: &mut Ui, scene: Result<&Scene, &GregoryError>) {
+pub fn show(ui: &mut Ui, scene: Result<&Scene, &GregoryError>, status: &EditStatus) {
     egui::ScrollArea::vertical().show(ui, |ui| {
         super::panel_heading(ui, "プロパティ");
+        CollapsingHeader::new("選択")
+            .default_open(true)
+            .show(ui, |ui| {
+                Grid::new("selection")
+                    .num_columns(2)
+                    .striped(true)
+                    .show(ui, |ui| {
+                        ui.label("モード");
+                        ui.label(mode_label(status.mode));
+                        ui.end_row();
+                        ui.label("選択数");
+                        ui.monospace(status.selected.to_string());
+                        ui.end_row();
+                        if let Some(p) = status.single_vertex {
+                            ui.label("座標");
+                            ui.monospace(format_position(p));
+                            ui.end_row();
+                        }
+                    });
+            });
         let scene = match scene {
             Ok(scene) => scene,
             Err(error) => {

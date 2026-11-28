@@ -1,9 +1,11 @@
+use std::collections::HashSet;
+
 use gregory_core::{CageModel, Edge, Model, TriMesh, Vec3, cross, sub};
 use gregory_editor::mesh_buffers::{
-    cage_lines, cage_points, flat_surface, scene_geometry, smooth_surface, surface_mesh,
+    Highlight, cage_lines, cage_points, flat_surface, scene_geometry, smooth_surface, surface_mesh,
 };
 use gregory_editor::palette;
-use gregory_editor::scene::{BuildKey, build_scene};
+use gregory_editor::scene::build_scene;
 use gregory_editor::settings::Shading;
 use proptest::prelude::*;
 
@@ -61,7 +63,7 @@ fn valid_tris(m: &TriMesh) -> Vec<[usize; 3]> {
 proptest! {
     #[test]
     fn smooth_surface_invariants(m in mesh()) {
-        let s = smooth_surface(&m);
+        let s = smooth_surface(&m, &HashSet::new());
         prop_assert_eq!(s.vertices.len(), m.pos.len());
         prop_assert_eq!(s.indices.len() % 3, 0);
         prop_assert!(s.indices.iter().all(|&i| (i as usize) < s.vertices.len()));
@@ -81,7 +83,7 @@ proptest! {
 
     #[test]
     fn flat_surface_invariants(m in mesh()) {
-        let s = flat_surface(&m);
+        let s = flat_surface(&m, &HashSet::new());
         let valid = valid_tris(&m);
         prop_assert_eq!(s.vertices.len(), valid.len() * 3);
         prop_assert_eq!(s.indices.len(), valid.len() * 3);
@@ -105,8 +107,8 @@ proptest! {
 
     #[test]
     fn surface_mesh_dispatch(m in mesh()) {
-        prop_assert_eq!(surface_mesh(&m, Shading::Smooth), smooth_surface(&m));
-        prop_assert_eq!(surface_mesh(&m, Shading::Flat), flat_surface(&m));
+        prop_assert_eq!(surface_mesh(&m, Shading::Smooth, &HashSet::new()), smooth_surface(&m, &HashSet::new()));
+        prop_assert_eq!(surface_mesh(&m, Shading::Flat, &HashSet::new()), flat_surface(&m, &HashSet::new()));
     }
 
     #[test]
@@ -133,7 +135,7 @@ proptest! {
             prop_assert!(pair.iter().all(|l| l.color == color));
             prop_assert!(pair.iter().all(|l| l.position.iter().all(|x| x.is_finite())));
         }
-        let pts = cage_points(&v);
+        let pts = cage_points(&v, &Highlight::default());
         prop_assert_eq!(pts.len(), v.iter().filter(|p| finite32(**p).is_some()).count());
         prop_assert!(pts.iter().all(|p| p.color == palette::CAGE_POINT));
     }
@@ -142,10 +144,10 @@ proptest! {
 #[test]
 fn empty_inputs() {
     let m = TriMesh::default();
-    assert!(smooth_surface(&m).vertices.is_empty());
-    assert!(flat_surface(&m).indices.is_empty());
+    assert!(smooth_surface(&m, &HashSet::new()).vertices.is_empty());
+    assert!(flat_surface(&m, &HashSet::new()).indices.is_empty());
     assert!(cage_lines(&[], &[]).is_empty());
-    assert!(cage_points(&[]).is_empty());
+    assert!(cage_points(&[], &Highlight::default()).is_empty());
 }
 
 #[test]
@@ -161,21 +163,20 @@ fn nan_triangle_dropped_but_valid_kept_in_order() {
         tris: vec![[0, 1, 3], [0, 1, 2], [0, 1, 9], [2, 1, 0]],
         tri_face: vec![],
     };
-    assert_eq!(smooth_surface(&m).indices, vec![0, 1, 2, 2, 1, 0]);
-    assert_eq!(flat_surface(&m).vertices.len(), 6);
+    assert_eq!(
+        smooth_surface(&m, &HashSet::new()).indices,
+        vec![0, 1, 2, 2, 1, 0]
+    );
+    assert_eq!(flat_surface(&m, &HashSet::new()).vertices.len(), 6);
 }
 
 #[test]
 fn cube_geometry_counts() {
-    let scene = build_scene(&BuildKey {
-        preset: gregory_core::Preset::Cube,
-        subdivisions: 4,
-    })
-    .unwrap();
+    let scene = build_scene(&gregory_core::Preset::Cube.make(), 4).unwrap();
     let CageModel { .. } = scene.cage;
     let Model { .. } = scene.model;
     for shading in Shading::ALL {
-        let g = scene_geometry(&scene.cage, &scene.model, shading);
+        let g = scene_geometry(&scene.cage, &scene.model, shading, &Highlight::default());
         assert_eq!(g.cage_lines.len(), 24);
         assert_eq!(g.cage_points.len(), 8);
         assert_eq!(g.surface.indices.len() % 3, 0);

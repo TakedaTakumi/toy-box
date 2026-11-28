@@ -1,7 +1,8 @@
 //! 画面に出す数値と判定の文字列。
 
-use gregory_core::ContinuityCheck;
+use gregory_core::{ContinuityCheck, SelectMode, Vec3};
 
+use crate::editing::selection::mode_label;
 use crate::scene::Scene;
 
 /// これ未満の法線の角度差（度）を「G1 成立」とする（JS 試作と同じ）。
@@ -124,4 +125,19 @@ impl FrameTimer {
     pub fn average_ms(&self) -> Option<f32> {
         self.average_ms
     }
+}
+
+/// 選択の状態の一文（JS 試作と同じ書き方）。
+pub fn selection_summary(mode: SelectMode, count: usize) -> String {
+    let label = mode_label(mode);
+    if count == 0 {
+        format!("{label}モード（未選択）")
+    } else {
+        format!("{label} {count} 個を選択中")
+    }
+}
+
+/// 座標を小数点以下2桁で並べる。
+pub fn format_position(p: Vec3) -> String {
+    format!("({:.2}, {:.2}, {:.2})", p[0], p[1], p[2])
 }

@@ -2,10 +2,6 @@
 
 use std::ops::RangeInclusive;
 
-use gregory_core::Preset;
-
-use crate::scene::BuildKey;
-
 /// 分割数の範囲（JS 試作のスライダーと同じ）。
 pub const SUBDIVISION_RANGE: RangeInclusive<usize> = 4..=16;
 pub const DEFAULT_SUBDIVISIONS: usize = 8;
@@ -44,21 +40,21 @@ impl Shading {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DisplaySettings {
-    pub preset: Preset,
     pub shading: Shading,
     subdivisions: usize,
     pub show_surface: bool,
     pub show_cage: bool,
+    pub show_curves: bool,
 }
 
 impl Default for DisplaySettings {
     fn default() -> Self {
         Self {
-            preset: Preset::Cube,
             shading: Shading::Smooth,
             subdivisions: DEFAULT_SUBDIVISIONS,
             show_surface: true,
             show_cage: true,
+            show_curves: true,
         }
     }
 }
@@ -70,13 +66,5 @@ impl DisplaySettings {
 
     pub fn set_subdivisions(&mut self, n: usize) {
         self.subdivisions = clamp_subdivisions(n);
-    }
-
-    /// 曲面の組み立てに効く設定だけを取り出す。
-    pub fn build_key(&self) -> BuildKey {
-        BuildKey {
-            preset: self.preset,
-            subdivisions: self.subdivisions,
-        }
     }
 }

@@ -16,6 +16,8 @@ pub struct Uniforms {
     pub up: [f32; 4],
     pub forward: [f32; 4],
     pub surface_color: [f32; 4],
+    /// 選択中の面に混ぜる色（rgb）と、その割合（a）。
+    pub highlight_color: [f32; 4],
     pub params: [f32; 4],
 }
 
@@ -24,6 +26,7 @@ pub struct Uniforms {
 pub struct Visibility {
     pub surface: bool,
     pub cage: bool,
+    pub curves: bool,
 }
 
 /// 大きさが足りなくなったら作り直す、書き込み用のバッファ。
@@ -88,9 +91,11 @@ pub struct SceneRenderer {
     surface_vertices: GrowableBuffer,
     surface_indices: GrowableBuffer,
     line_vertices: GrowableBuffer,
+    curve_vertices: GrowableBuffer,
     point_instances: GrowableBuffer,
     surface_index_count: u32,
     line_vertex_count: u32,
+    curve_vertex_count: u32,
     point_count: u32,
     uploaded_revision: Option<u64>,
     output_is_srgb: bool,
@@ -147,7 +152,8 @@ impl SceneRenderer {
             depth_format,
         };
 
-        let surface_attributes = wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3];
+        let surface_attributes =
+            wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3, 2 => Float32];
         let surface_pipeline = factory.create(&PipelineSpec {
             label: "gregory_surface",
             vertex_entry: "vs_surface",
@@ -173,7 +179,8 @@ impl SceneRenderer {
             },
             always_on_top: true,
         });
-        let point_attributes = wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3];
+        let point_attributes =
+            wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3, 2 => Float32];
         let point_pipeline = factory.create(&PipelineSpec {
             label: "gregory_cage_points",
             vertex_entry: "vs_point",
@@ -208,6 +215,11 @@ impl SceneRenderer {
                 "gregory_cage_lines",
                 wgpu::BufferUsages::VERTEX,
             ),
+            curve_vertices: GrowableBuffer::new(
+                device,
+                "gregory_curve_lines",
+                wgpu::BufferUsages::VERTEX,
+            ),
             point_instances: GrowableBuffer::new(
                 device,
                 "gregory_cage_points",
@@ -215,6 +227,7 @@ impl SceneRenderer {
             ),
             surface_index_count: 0,
             line_vertex_count: 0,
+            curve_vertex_count: 0,
             point_count: 0,
             uploaded_revision: None,
             output_is_srgb: target_format.is_srgb(),
@@ -247,11 +260,14 @@ impl SceneRenderer {
             .write(device, queue, bytemuck::cast_slice(&surface.indices));
         self.line_vertices
             .write(device, queue, bytemuck::cast_slice(&geometry.cage_lines));
+        self.curve_vertices
+            .write(device, queue, bytemuck::cast_slice(&geometry.curve_lines));
         self.point_instances
             .write(device, queue, bytemuck::cast_slice(&geometry.cage_points));
         self.surface_index_count = count_u32(surface.indices.len());
         // LineList は2頂点で1本なので、端数の頂点は描かない
         self.line_vertex_count = count_u32(geometry.cage_lines.len() & !1);
+        self.curve_vertex_count = count_u32(geometry.curve_lines.len() & !1);
         self.point_count = count_u32(geometry.cage_points.len());
     }
 
@@ -270,6 +286,11 @@ impl SceneRenderer {
             pass.set_pipeline(&self.line_pipeline);
             pass.set_vertex_buffer(0, self.line_vertices.buffer.slice(..));
             pass.draw(0..self.line_vertex_count, 0..1);
+        }
+        if visibility.curves && self.curve_vertex_count > 0 {
+            pass.set_pipeline(&self.line_pipeline);
+            pass.set_vertex_buffer(0, self.curve_vertices.buffer.slice(..));
+            pass.draw(0..self.curve_vertex_count, 0..1);
         }
         if visibility.cage && self.point_count > 0 {
             pass.set_pipeline(&self.point_pipeline);
